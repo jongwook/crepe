@@ -8,7 +8,7 @@ class Dataset(ABC):
 
     @classmethod
     def of(cls, *items):
-
+        pass
 
     @abstractmethod
     def _iterable(self):

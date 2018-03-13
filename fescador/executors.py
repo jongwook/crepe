@@ -3,7 +3,7 @@ import pickle
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor as TPE
 from queue import Queue
-from typing import Iterable, Callable, Generator
+from typing import Iterable, Callable, Generator, Optional
 
 
 def iter_until_none(f: Callable, count=1) -> Generator:

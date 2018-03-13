@@ -1,15 +1,17 @@
+import multiprocessing as mp
+import pickle
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor as TPE
 from queue import Queue
 from typing import Iterable, Callable, Generator
-import multiprocessing as mp
-import pickle
 
 
 def iter_until_none(f: Callable, count=1) -> Generator:
     seen = 0
     while True:
         item = f()
+        if isinstance(item, BaseException):
+            raise item
         if item is None:
             seen += 1
             if seen == count:
@@ -36,18 +38,22 @@ class BackgroundThreadExecutor(Executor):
     def execute(self, task: Callable, upstream: Iterable) -> Generator:
         queue = Queue(maxsize=1)
         background = TPE(1, 'background-executor')
-        background.submit(self._work, upstream, task, queue, background)
+        background.submit(self._work, upstream, task, queue)
 
         for output in iter_until_none(queue.get):
             yield output
 
+        background.shutdown()
+
     @classmethod
-    def _work(cls, upstream: Iterable, task: Callable, queue: Queue, executor: TPE):
+    def _work(cls, upstream: Iterable, task: Callable, queue: Queue):
         for item in upstream:
-            for output in task(item):
-                queue.put(output)
+            try:
+                for output in task(item):
+                    queue.put(output)
+            except BaseException as e:
+                queue.put(e)
         queue.put(None)
-        executor.shutdown(wait=False)
 
 
 class ThreadPoolExecutor(Executor):
@@ -82,8 +88,11 @@ class ThreadPoolExecutor(Executor):
     @classmethod
     def _work(cls, input_queue: Queue, task: Callable, output_queue: Queue):
         for item in iter_until_none(input_queue.get):
-            for output in task(item):
-                output_queue.put(output)
+            try:
+                for output in task(item):
+                    output_queue.put(output)
+            except BaseException as e:
+                output_queue.put(e)
         output_queue.put(None)
 
 
@@ -117,19 +126,9 @@ class MultiProcessingExecutor(Executor):
     @classmethod
     def _work(cls, input_queue: mp.Queue, task: Callable, output_queue: mp.Queue):
         for item in iter_until_none(input_queue.get):
-            for output in task(pickle.loads(item)):
-                output_queue.put(pickle.dumps(output))
+            try:
+                for output in task(pickle.loads(item)):
+                    output_queue.put(pickle.dumps(output))
+            except BaseException as e:
+                output_queue.put(pickle.dumps(e))
         output_queue.put(None)
-
-
-import time
-import numpy as np
-
-def add1(n):
-    time.sleep(1)
-    yield n + 10
-
-
-if __name__ == "__main__":
-    t = ThreadPoolExecutor(5)
-    print(list(t.execute(add1, np.random.randn(10, 10))))

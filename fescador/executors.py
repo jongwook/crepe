@@ -23,22 +23,29 @@ def iterate_until_none(f: Callable, count=1) -> Generator:
 
 class Executor(ABC):
     @abstractmethod
-    def execute(self, task: Callable, upstream: Iterable) -> Generator:
+    def execute(self, transformer: Callable, upstream: Iterable) -> Generator:
+        pass
+
+    @abstractmethod
+    def parallelism(self):
         pass
 
 
 class CurrentThreadExecutor(Executor):
-    def execute(self, task: Callable, upstream: Iterable) -> Generator:
+    def execute(self, transformer: Callable, upstream: Iterable) -> Generator:
         for item in upstream:
-            for output in task(item):
+            for output in transformer(item):
                 yield output
+
+    def parallelism(self):
+        return 1
 
 
 class BackgroundThreadExecutor(Executor):
-    def execute(self, task: Callable, upstream: Iterable) -> Generator:
+    def execute(self, transformer: Callable, upstream: Iterable) -> Generator:
         queue = Queue(maxsize=1)
         background = TPE(1, 'background-executor')
-        background.submit(self._work, upstream, task, queue)
+        background.submit(self._work, upstream, transformer, queue)
 
         for output in iterate_until_none(queue.get):
             yield output
@@ -46,14 +53,17 @@ class BackgroundThreadExecutor(Executor):
         background.shutdown()
 
     @classmethod
-    def _work(cls, upstream: Iterable, task: Callable, queue: Queue):
+    def _work(cls, upstream: Iterable, transformer: Callable, queue: Queue):
         for item in upstream:
             try:
-                for output in task(item):
+                for output in transformer(item):
                     queue.put(output)
             except BaseException as e:
                 queue.put(e)
         queue.put(None)
+
+    def parallelism(self):
+        return 1
 
 
 class ThreadPoolExecutor(Executor):
@@ -86,21 +96,24 @@ class ThreadPoolExecutor(Executor):
             input_queue.put(None)
 
     @classmethod
-    def _work(cls, input_queue: Queue, task: Callable, output_queue: Queue):
+    def _work(cls, input_queue: Queue, transformer: Callable, output_queue: Queue):
         for item in iterate_until_none(input_queue.get):
             try:
-                for output in task(item):
+                for output in transformer(item):
                     output_queue.put(output)
             except BaseException as e:
                 output_queue.put(e)
         output_queue.put(None)
+
+    def parallelism(self):
+        return self.threads
 
 
 class MultiProcessingExecutor(Executor):
     def __init__(self, processes):
         self.processes = processes
 
-    def execute(self, task: Callable, upstream: Iterable) -> Generator:
+    def execute(self, transformer: Callable, upstream: Iterable) -> Generator:
         manager = mp.Manager()
         manager.register('None', type(None))
         input_queue = manager.Queue(maxsize=self.processes)
@@ -111,7 +124,7 @@ class MultiProcessingExecutor(Executor):
 
         with mp.Pool(self.processes) as pool:
             for _ in range(self.processes):
-                pool.apply_async(MultiProcessingExecutor._work, args=(input_queue, task, output_queue))
+                pool.apply_async(MultiProcessingExecutor._work, args=(input_queue, transformer, output_queue))
             for output in iterate_until_none(output_queue.get, self.processes):
                 yield pickle.loads(output)
 
@@ -124,11 +137,14 @@ class MultiProcessingExecutor(Executor):
             input_queue.put(None)
 
     @classmethod
-    def _work(cls, input_queue: mp.Queue, task: Callable, output_queue: mp.Queue):
+    def _work(cls, input_queue: mp.Queue, transformer: Callable, output_queue: mp.Queue):
         for item in iterate_until_none(input_queue.get):
             try:
-                for output in task(pickle.loads(item)):
+                for output in transformer(pickle.loads(item)):
                     output_queue.put(pickle.dumps(output))
             except BaseException as e:
                 output_queue.put(pickle.dumps(e))
         output_queue.put(None)
+
+    def parallelism(self):
+        return self.processes

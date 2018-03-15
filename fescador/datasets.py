@@ -1,7 +1,9 @@
-from abc import ABC, abstractmethod
-from .executors import *
+from random import Random
 from typing import List
+
 from . import readers
+from . import writers
+from .executors import *
 
 
 class BaseDataset(ABC):
@@ -14,17 +16,57 @@ class BaseDataset(ABC):
     def filter(self, function, **kwargs) -> 'BaseDataset':
         return FilteredDataset(self, function, **kwargs)
 
-    def foreach(self, function, **kwargs):
+    def transform(self, function, **kwargs) -> 'BaseDataset':
+        return TransformedDataset(self, function, **kwargs)
+
+    def foreach(self, function, **kwargs) -> None:
         for _ in self.map(function, **kwargs):
             pass
 
-    def collect(self):
+    def collect(self) -> list:
         return list(self)
 
     def take(self, count):
         return [item for item, n in zip(self, range(count))]
 
-    def _executor(self, **kwargs) -> Executor:
+    def skip(self, count) -> 'BaseDataset':
+        raise NotImplementedError
+
+    def group(self, size) -> 'BaseDataset':
+        raise NotImplementedError
+
+    def batch(self, size) -> 'BaseDataset':
+        raise NotImplementedError
+
+    def cache(self) -> 'BaseDataset':
+        raise NotImplementedError
+
+    def select(self, *keys, **kwargs):
+        return self.map(lambda row: {key: row[key] for key in keys}, **kwargs)
+
+    def shuffle(self, buffer_size, seed=None):
+        def generator(buffer_size, seed):
+            random = Random(seed)
+
+            # fill the buffer
+            iterator = iter(self)
+            buffer = [item for _, item in zip(range(buffer_size), iterator)]
+            random.shuffle(buffer)
+
+            # sample one from the buffer and replace with a new one pulled from the iterator
+            for item in iterator:
+                i = random.randrange(buffer_size)
+                yield buffer[i]
+                buffer[i] = item
+
+            # drain any remaining items
+            for item in buffer:
+                if item is not None:
+                    yield item
+
+        return self.flatmap
+
+    def executor(self, **kwargs) -> Executor:
         if 'executor' in kwargs:
             executor = kwargs['executor']
             if isinstance(executor, Executor):
@@ -38,21 +80,22 @@ class BaseDataset(ABC):
         if len(kwargs) > 0:
             raise ValueError("Unknown kwargs:", kwargs.keys())
         try:
-            return self._upstream()[0]._executor()
+            return self._upstream()[0].executor()
         except IndexError:
             return CurrentThreadExecutor()
 
     @abstractmethod
     def _upstream(self) -> List['BaseDataset']:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def __iter__(self):
-        pass
+        raise NotImplementedError
 
 
 class Dataset(BaseDataset):
     read = readers.LazyLoader()
+    write: writers.LazyLoader
 
     def __init__(self, *args, **kwargs):
         if (len(args) == 0) == (len(kwargs) == 0):
@@ -68,6 +111,8 @@ class Dataset(BaseDataset):
         # dataset of dicts
         if len(kwargs) > 0:
             self._items = kwargs
+
+        self.write = writers.LazyLoader(self)
 
     def _upstream(self):
         return []
@@ -94,6 +139,19 @@ class InMemoryDataset(BaseDataset):
         return iter(self._items)
 
 
+class TransformedDataset(BaseDataset):
+    def __init__(self, parent, transformer, **kwargs):
+        self._parent = parent
+        self._transformer = transformer
+        self._kwargs = kwargs
+
+    def _upstream(self):
+        return [self._parent]
+
+    def __iter__(self):
+        return self.executor(**self._kwargs).execute(self._transformer, self._parent)
+
+
 class FlatMappedDataset(BaseDataset):
     def __init__(self, parent, function, **kwargs):
         self._parent = parent
@@ -104,27 +162,15 @@ class FlatMappedDataset(BaseDataset):
         return [self._parent]
 
     def __iter__(self):
-        return self._executor(**self._kwargs).execute(self._function, self._parent)
+        return self.executor(**self._kwargs).execute(self._function, self._parent)
 
 
 class FilteredDataset(FlatMappedDataset):
     def __init__(self, parent, function, **kwargs):
-        super(FilteredDataset, self).__init__(parent, lambda x: function(x) and [x] or [], **kwargs)
+        super().__init__(parent, lambda x: function(x) and [x] or [], **kwargs)
 
 
 class MappedDataset(FlatMappedDataset):
     def __init__(self, parent, function, **kwargs):
-        super(MappedDataset, self).__init__(parent, lambda x: [function(x)], **kwargs)
+        super().__init__(parent, lambda x: [function(x)], **kwargs)
 
-
-class InputDataset(BaseDataset):
-    args = []
-    kwargs = {}
-
-    def __init__(self, iterable_supplier, *args, **kwargs):
-        if callable(iterable_supplier):
-            self.iterable_supplier = iterable_supplier
-            self.args = args
-            self.kwargs = kwargs
-        else:
-            self.iterable_supplier = lambda: iterable_supplier

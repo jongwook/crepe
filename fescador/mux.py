@@ -1,15 +1,15 @@
 from random import Random
 from typing import List
 
-from .datasets import BaseDataset
+from .datasets import Dataset
 from .executors import Executor, CurrentThreadExecutor
 
 
-class Mux(BaseDataset):
-    def __init__(self, datasets: List[BaseDataset]):
+class Mux(Dataset):
+    def __init__(self, datasets: List[Dataset]):
         self.datasets = datasets
 
-    def _upstream(self) -> List[BaseDataset]:
+    def _upstream(self) -> List[Dataset]:
         return self.datasets
 
     def executor(self, **kwargs) -> Executor:

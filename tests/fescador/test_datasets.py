@@ -1,6 +1,7 @@
-from fescador import Dataset
 from threading import current_thread
-from multiprocessing import current_process
+
+from fescador import Dataset
+
 
 def assert_equal(dataset: Dataset, target: list):
     assert list(dataset) == target

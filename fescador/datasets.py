@@ -6,17 +6,26 @@ from . import writers
 from .executors import *
 
 
-class BaseDataset(ABC):
-    def map(self, function, **kwargs) -> 'BaseDataset':
+class Dataset(ABC):
+    read = readers.LazyLoader()
+    write: writers.LazyLoader
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls is Dataset and InMemoryDataset or cls)
+
+    def __init__(self, *args, **kwargs):
+        self.write = writers.LazyLoader(self)
+
+    def map(self, function, **kwargs) -> 'Dataset':
         return MappedDataset(self, function, **kwargs)
 
-    def flatmap(self, function, **kwargs) -> 'BaseDataset':
+    def flatmap(self, function, **kwargs) -> 'Dataset':
         return FlatMappedDataset(self, function, **kwargs)
 
-    def filter(self, function, **kwargs) -> 'BaseDataset':
+    def filter(self, function, **kwargs) -> 'Dataset':
         return FilteredDataset(self, function, **kwargs)
 
-    def transform(self, function, **kwargs) -> 'BaseDataset':
+    def transform(self, function, **kwargs) -> 'Dataset':
         return TransformedDataset(self, function, **kwargs)
 
     def foreach(self, function, **kwargs) -> None:
@@ -29,16 +38,16 @@ class BaseDataset(ABC):
     def take(self, count):
         return [item for item, n in zip(self, range(count))]
 
-    def skip(self, count) -> 'BaseDataset':
+    def skip(self, count) -> 'Dataset':
         raise NotImplementedError
 
-    def group(self, size) -> 'BaseDataset':
+    def group(self, size) -> 'Dataset':
         raise NotImplementedError
 
-    def batch(self, size) -> 'BaseDataset':
+    def batch(self, size) -> 'Dataset':
         raise NotImplementedError
 
-    def cache(self) -> 'BaseDataset':
+    def cache(self) -> 'Dataset':
         raise NotImplementedError
 
     def select(self, *keys, **kwargs):
@@ -85,7 +94,7 @@ class BaseDataset(ABC):
             return CurrentThreadExecutor()
 
     @abstractmethod
-    def _upstream(self) -> List['BaseDataset']:
+    def _upstream(self) -> List['Dataset']:
         raise NotImplementedError
 
     @abstractmethod
@@ -93,11 +102,10 @@ class BaseDataset(ABC):
         raise NotImplementedError
 
 
-class Dataset(BaseDataset):
-    read = readers.LazyLoader()
-    write: writers.LazyLoader
-
+class InMemoryDataset(Dataset):
     def __init__(self, *args, **kwargs):
+        super().__init__()
+
         if (len(args) == 0) == (len(kwargs) == 0):
             raise ValueError('either args or kwargs must be given')
 
@@ -111,8 +119,6 @@ class Dataset(BaseDataset):
         # dataset of dicts
         if len(kwargs) > 0:
             self._items = kwargs
-
-        self.write = writers.LazyLoader(self)
 
     def _upstream(self):
         return []
@@ -128,18 +134,7 @@ class Dataset(BaseDataset):
                 yield item
 
 
-class InMemoryDataset(BaseDataset):
-    def __init__(self, items):
-        self._items = items
-
-    def _upstream(self):
-        return []
-
-    def __iter__(self):
-        return iter(self._items)
-
-
-class TransformedDataset(BaseDataset):
+class TransformedDataset(Dataset):
     def __init__(self, parent, transformer, **kwargs):
         self._parent = parent
         self._transformer = transformer

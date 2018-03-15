@@ -123,24 +123,24 @@ class MultiProcessingExecutor(Executor):
             for _ in range(self.processes):
                 pool.apply_async(MultiProcessingExecutor._work, args=(input_queue, transformer, output_queue))
             for output in iterate_until_none(output_queue.get, self.processes):
-                yield pickle.loads(output)
+                yield output
 
         collector.shutdown()
 
     def _collect(self, upstream: Iterable, input_queue: mp.Queue):
         for item in upstream:
-            input_queue.put(pickle.dumps(item))
+            input_queue.put(item)
         for _ in range(self.processes):
             input_queue.put(None)
 
     @classmethod
     def _work(cls, input_queue: mp.Queue, transformer: Callable, output_queue: mp.Queue):
-        items = (pickle.loads(item) for item in iterate_until_none(input_queue.get))
+        items = (item for item in iterate_until_none(input_queue.get))
         try:
             for output in transformer(items):
-                output_queue.put(pickle.dumps(output))
+                output_queue.put(output)
         except BaseException as e:
-            output_queue.put(pickle.dumps(e))
+            output_queue.put(e)
         output_queue.put(None)
 
     def parallelism(self):

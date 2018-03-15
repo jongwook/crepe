@@ -67,9 +67,8 @@ def test_eratosthenes():
     def sieve(dataset: Dataset):
         first = dataset.first()
         tail = dataset.skip(1).filter(lambda x: x % first != 0)
-        return Dataset([first]) + (lambda: sieve(tail))
+        return first + Dataset(lambda: sieve(tail))
 
-    dataset = Dataset(integers())
-    sieve(dataset).take(10)
-
-
+    dataset = Dataset(lambda: integers())
+    primes = list(sieve(dataset).take(10))
+    assert primes == [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]

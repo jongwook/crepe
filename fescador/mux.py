@@ -19,13 +19,16 @@ class Mux(Dataset):
 class SequentialMux(Mux):
     def __iter__(self):
         for dataset in self.datasets:
+            if callable(dataset):
+                dataset = dataset()
             for item in dataset:
                 yield item
 
 
 class RoundRobinMux(Mux):
     def __iter__(self):
-        iterators = list(map(iter, self.datasets))
+        datasets = [callable(d) and d() or d for d in self.datasets]
+        iterators = list(map(iter, datasets))
         while len(iterators) > 0:
             for iterator in iterators:
                 try:
@@ -33,3 +36,11 @@ class RoundRobinMux(Mux):
                 except StopIteration:
                     iterators.remove(iterator)
 
+
+class PoissonMux(Mux):
+    def __init__(self, datasets):
+        super().__init__(datasets)
+        raise NotImplementedError  # TODO
+
+    def __iter__(self):
+        raise NotImplementedError  # TODO

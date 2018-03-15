@@ -1,5 +1,6 @@
 from random import Random
 from typing import List
+import pandas as pd
 
 from . import readers
 from . import writers
@@ -16,20 +17,20 @@ class Dataset(ABC):
     def __init__(self, *args, **kwargs):
         self.write = writers.LazyLoader(self)
 
-    def map(self, function, **kwargs) -> 'Dataset':
-        return MappedDataset(self, function, **kwargs)
+    def map(self, function, **executor_config) -> 'Dataset':
+        return MappedDataset(self, function, **executor_config)
 
-    def flatmap(self, function, **kwargs) -> 'Dataset':
-        return FlatMappedDataset(self, function, **kwargs)
+    def flatmap(self, function, **executor_config) -> 'Dataset':
+        return FlatMappedDataset(self, function, **executor_config)
 
-    def filter(self, function, **kwargs) -> 'Dataset':
-        return FilteredDataset(self, function, **kwargs)
+    def filter(self, function, **executor_config) -> 'Dataset':
+        return FilteredDataset(self, function, **executor_config)
 
-    def transform(self, function, **kwargs) -> 'Dataset':
-        return TransformedDataset(self, function, **kwargs)
+    def transform(self, function, **executor_config) -> 'Dataset':
+        return TransformedDataset(self, function, **executor_config)
 
-    def foreach(self, function, **kwargs) -> None:
-        for _ in self.map(lambda item: function(item) or True, **kwargs):
+    def foreach(self, function, **executor_config) -> None:
+        for _ in self.map(lambda item: function(item) or True, **executor_config):
             pass
 
     def collect(self) -> list:
@@ -54,30 +55,49 @@ class Dataset(ABC):
         raise NotImplementedError
 
     def cache(self) -> 'Dataset':
+        return CachedDataset(self)
+
+    def select(self, *keys, **executor_config):
+        return self.map(lambda row: {key: row[key] for key in keys}, **executor_config)
+
+    def shuffle(self, buffer_size=-1, seed=None):
         raise NotImplementedError
 
-    def select(self, *keys, **kwargs):
-        return self.map(lambda row: {key: row[key] for key in keys}, **kwargs)
+    @classmethod
+    def concat(cls, datasets: List['Dataset']) -> 'Dataset':
+        from .mux import SequentialMux
+        return SequentialMux(datasets)
 
-    def shuffle(self, buffer_size, seed=None):
-        raise NotImplementedError
+    @classmethod
+    def roundrobin(cls, datasets: List['Dataset']) -> 'Dataset':
+        from .mux import RoundRobinMux
+        return RoundRobinMux(datasets)
 
-    def executor(self, **kwargs) -> Executor:
-        if 'executor' in kwargs:
-            executor = kwargs['executor']
+    def __add__(self, other) -> 'Dataset':
+        if isinstance(other, Dataset) or callable(other):
+            from .mux import SequentialMux
+            return SequentialMux([self, other])
+        raise ValueError("unknown operand type: {}".format(type(other)))
+
+    def __radd__(self, other) -> 'Dataset':
+        return PrependedDataset(self, other)
+
+    def executor(self, **executor_config) -> Executor:
+        if 'executor' in executor_config:
+            executor = executor_config['executor']
             if isinstance(executor, Executor):
                 return executor
-        if 'background' in kwargs:
-            if kwargs['background'] is True:
+        if 'background' in executor_config:
+            if executor_config['background'] is True:
                 return BackgroundThreadExecutor()
             else:
                 return CurrentThreadExecutor()
-        if 'num_threads' in kwargs:
-            return ThreadPoolExecutor(int(kwargs['num_threads']))
-        if 'num_processes' in kwargs:
-            return MultiProcessingExecutor(int(kwargs['num_processes']))
-        if len(kwargs) > 0:
-            raise ValueError("Unknown kwargs:", kwargs.keys())
+        if 'num_threads' in executor_config:
+            return ThreadPoolExecutor(int(executor_config['num_threads']))
+        if 'num_processes' in executor_config:
+            return MultiProcessingExecutor(int(executor_config['num_processes']))
+        if len(executor_config) > 0:
+            raise ValueError("Unknown executor_config:", executor_config.keys())
         try:
             return self._upstream()[0].executor()
         except IndexError:
@@ -99,12 +119,16 @@ class InMemoryDataset(Dataset):
         if (len(args) == 0) == (len(kwargs) == 0):
             raise ValueError('either args or kwargs must be given')
 
-        # dataset of tuples (or single items):
-        if len(args) > 0:
-            if len(args) == 1:
-                self._items = args[0]
+        if len(args) == 1:
+            if isinstance(args[0], pd.DataFrame):
+                # pandas dataframe to dataset of dicts
+                self._items = args[0].to_dict('records')
             else:
-                self._items = zip(*args)
+                # dataset of single items
+                self._items = args[0]
+        elif len(args) > 0:
+            # dataset of tuples:
+            self._items = zip(*args)
 
         # dataset of dicts
         if len(kwargs) > 0:
@@ -117,10 +141,11 @@ class InMemoryDataset(Dataset):
         if isinstance(self._items, dict):
             keys = list(self._items.keys())
             values = [self._items[key] for key in keys]
-            for tuple in zip(*values):
-                yield {key: value for key, value in zip(keys, tuple)}
+            for record in zip(*values):
+                yield {key: value for key, value in zip(keys, record)}
         else:
-            for item in self._items:
+            items = callable(self._items) and self._items() or self._items
+            for item in items:
                 yield item
 
 
@@ -140,29 +165,57 @@ class LoopedDataset(Dataset):
 
 
 class TransformedDataset(Dataset):
-    def __init__(self, upstream, transformer, **kwargs):
+    def __init__(self, upstream, transformer, **executor_config):
         super().__init__()
         self.upstream = upstream
         self.transformer = transformer
-        self.kwargs = kwargs
+        self.executor_config = executor_config
 
     def _upstream(self):
         return [self.upstream]
 
     def __iter__(self):
-        return self.executor(**self.kwargs).execute(self.transformer, self.upstream)
+        return self.executor(**self.executor_config).execute(self.transformer, self.upstream)
 
 
 class MappedDataset(TransformedDataset):
-    def __init__(self, upstream, mapper, **kwargs):
-        super().__init__(upstream, lambda items: (mapper(x) for x in items), **kwargs)
+    def __init__(self, upstream, mapper, **executor_config):
+        super().__init__(upstream, lambda items: (mapper(x) for x in items), **executor_config)
 
 
 class FilteredDataset(TransformedDataset):
-    def __init__(self, upstream, predicate, **kwargs):
-        super().__init__(upstream, lambda items: (x for x in items if predicate(x)), **kwargs)
+    def __init__(self, upstream, predicate, **executor_config):
+        super().__init__(upstream, lambda items: (x for x in items if predicate(x)), **executor_config)
 
 
 class FlatMappedDataset(TransformedDataset):
-    def __init__(self, upstream, flatmapper, **kwargs):
-        super().__init__(upstream, lambda items: (y for x in items for y in flatmapper(x)), **kwargs)
+    def __init__(self, upstream, flatmapper, **executor_config):
+        super().__init__(upstream, lambda items: (y for x in items for y in flatmapper(x)), **executor_config)
+
+
+class CachedDataset(Dataset):
+    def __init__(self, upstream):
+        super().__init__()
+        self.upstream = upstream
+        self.cache = list(upstream)
+
+    def _upstream(self):
+        return self.upstream
+
+    def __iter__(self):
+        return iter(self.cache)
+
+
+class PrependedDataset(Dataset):
+    def __init__(self, upstream, other):
+        super().__init__()
+        self.upstream = upstream
+        self.other = other
+
+    def _upstream(self) -> List['Dataset']:
+        return [self.upstream]
+
+    def __iter__(self):
+        yield self.other
+        for item in self.upstream:
+            yield item

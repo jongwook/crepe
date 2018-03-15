@@ -1,5 +1,4 @@
 import multiprocess as mp
-import pickle
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor as TPE
 from queue import Queue
@@ -94,9 +93,8 @@ class ThreadPoolExecutor(Executor):
 
     @classmethod
     def _work(cls, input_queue: Queue, transformer: Callable, output_queue: Queue):
-        items = (item for item in iterate_until_none(input_queue.get))
         try:
-            for output in transformer(items):
+            for output in transformer(iterate_until_none(input_queue.get)):
                 output_queue.put(output)
         except BaseException as e:
             output_queue.put(e)
@@ -135,9 +133,8 @@ class MultiProcessingExecutor(Executor):
 
     @classmethod
     def _work(cls, input_queue: mp.Queue, transformer: Callable, output_queue: mp.Queue):
-        items = (item for item in iterate_until_none(input_queue.get))
         try:
-            for output in transformer(items):
+            for output in transformer(iterate_until_none(input_queue.get)):
                 output_queue.put(output)
         except BaseException as e:
             output_queue.put(e)

@@ -42,3 +42,34 @@ def test_numpy(options):
 
     assert np.array_equal(data[0], np.array([2, 2]))
     assert np.array_equal(data[1], np.array([2, 2]))
+
+
+def test_sequential_mux():
+    a = Dataset([1, 2, 3])
+    b = Dataset([4, 5, 6])
+    mux = Dataset.concat([a, b])
+    assert_equal(mux, [1, 2, 3, 4, 5, 6])
+
+
+def test_round_robin_mux():
+    a = Dataset([1, 2, 3])
+    b = Dataset([4, 5, 6])
+    mux = Dataset.roundrobin([a, b])
+    assert_equal(mux, [1, 4, 2, 5, 3, 6])
+
+
+def test_eratosthenes():
+    def integers(starting=2):
+        while True:
+            yield starting
+            starting += 1
+
+    def sieve(dataset: Dataset):
+        first = dataset.first()
+        tail = dataset.skip(1).filter(lambda x: x % first != 0)
+        return Dataset([first]) + (lambda: sieve(tail))
+
+    dataset = Dataset(integers())
+    sieve(dataset).take(10)
+
+

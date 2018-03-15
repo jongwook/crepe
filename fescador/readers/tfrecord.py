@@ -34,10 +34,10 @@ def read_records(path: str, keys: List[str], options: tf.python_io.TFRecordOptio
             yield {key: parse_feature(feature_map[key]) for key in keys}
 
 
-def tfrecord(*paths: str, keys: List[str]=None, compression: Optional[str]=None, **kwargs):
+def tfrecord(*paths: str, keys: List[str]=None, compression: Optional[str]=None, **executor_config):
     options = None
     if compression and compression.lower() == 'gzip':
         options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.GZIP)
     elif compression and compression.lower() == 'zlib':
         options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.ZLIB)
-    return Dataset(paths).flatmap(lambda path: read_records(path, keys, options), **kwargs)
+    return Dataset(paths).flatmap(lambda path: read_records(path, keys, options), **executor_config)

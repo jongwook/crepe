@@ -35,11 +35,17 @@ class Dataset(ABC):
     def collect(self) -> list:
         return list(self)
 
-    def take(self, count) -> 'Dataset':
+    def first(self):
+        return next(iter(self))
+
+    def take(self, count: int) -> 'Dataset':
         return self.transform(lambda items: (item for item, n in zip(self, range(count))), background=False)
 
-    def skip(self, count) -> 'Dataset':
+    def skip(self, count: int) -> 'Dataset':
         return self.transform(lambda items: (item for i, item in enumerate(self) if i >= count), background=False)
+
+    def loop(self, count: int=-1) -> 'Dataset':
+        return LoopedDataset(self, count)
 
     def group(self, size) -> 'Dataset':
         raise NotImplementedError
@@ -118,30 +124,45 @@ class InMemoryDataset(Dataset):
                 yield item
 
 
-class TransformedDataset(Dataset):
-    def __init__(self, parent, transformer, **kwargs):
+class LoopedDataset(Dataset):
+    def __init__(self, upstream, count=-1):
         super().__init__()
-        self._parent = parent
-        self._transformer = transformer
-        self._kwargs = kwargs
+        self.upstream = upstream
+        self.count = count
 
     def _upstream(self):
-        return [self._parent]
+        return [self.upstream]
 
     def __iter__(self):
-        return self.executor(**self._kwargs).execute(self._transformer, self._parent)
+        for _ in self.count >= 0 and range(self.count) or iter(int, 1):
+            for item in self.upstream:
+                yield item
+
+
+class TransformedDataset(Dataset):
+    def __init__(self, upstream, transformer, **kwargs):
+        super().__init__()
+        self.upstream = upstream
+        self.transformer = transformer
+        self.kwargs = kwargs
+
+    def _upstream(self):
+        return [self.upstream]
+
+    def __iter__(self):
+        return self.executor(**self.kwargs).execute(self.transformer, self.upstream)
 
 
 class MappedDataset(TransformedDataset):
-    def __init__(self, parent, mapper, **kwargs):
-        super().__init__(parent, lambda items: (mapper(x) for x in items), **kwargs)
+    def __init__(self, upstream, mapper, **kwargs):
+        super().__init__(upstream, lambda items: (mapper(x) for x in items), **kwargs)
 
 
 class FilteredDataset(TransformedDataset):
-    def __init__(self, parent, predicate, **kwargs):
-        super().__init__(parent, lambda items: (x for x in items if predicate(x)), **kwargs)
+    def __init__(self, upstream, predicate, **kwargs):
+        super().__init__(upstream, lambda items: (x for x in items if predicate(x)), **kwargs)
 
 
 class FlatMappedDataset(TransformedDataset):
-    def __init__(self, parent, flatmapper, **kwargs):
-        super().__init__(parent, lambda items: (y for x in items for y in flatmapper(x)), **kwargs)
+    def __init__(self, upstream, flatmapper, **kwargs):
+        super().__init__(upstream, lambda items: (y for x in items for y in flatmapper(x)), **kwargs)

@@ -31,8 +31,8 @@ def test_executor_options():
     assert_equal_unordered(data.map(lambda x: x + 1, num_processes=3), [2, 3, 4])
 
     tid = current_thread().ident
-    assert Dataset([1]).map(lambda _: current_thread().ident).take(1) == [tid]
-    assert Dataset([1]).map(lambda _: current_thread().ident, num_threads=1).take(1) != [tid]
+    assert Dataset([1]).map(lambda _: current_thread().ident).first() == tid
+    assert Dataset([1]).map(lambda _: current_thread().ident, num_threads=1).first() != tid
 
 
 @pytest.mark.parametrize('options', [{}, {'background': True}, {'num_threads': 3}, {'num_processes': 3}])

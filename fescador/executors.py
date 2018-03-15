@@ -33,9 +33,7 @@ class Executor(ABC):
 
 class CurrentThreadExecutor(Executor):
     def execute(self, transformer: Callable, upstream: Iterable) -> Generator:
-        for item in upstream:
-            for output in transformer(item):
-                yield output
+        return transformer(upstream)
 
     def parallelism(self):
         return 1
@@ -54,12 +52,11 @@ class BackgroundThreadExecutor(Executor):
 
     @classmethod
     def _work(cls, upstream: Iterable, transformer: Callable, queue: Queue):
-        for item in upstream:
-            try:
-                for output in transformer(item):
-                    queue.put(output)
-            except BaseException as e:
-                queue.put(e)
+        try:
+            for output in transformer(upstream):
+                queue.put(output)
+        except BaseException as e:
+            queue.put(e)
         queue.put(None)
 
     def parallelism(self):
@@ -72,7 +69,7 @@ class ThreadPoolExecutor(Executor):
     def __init__(self, threads):
         self.threads = threads
 
-    def execute(self, task: Callable, upstream: Iterable) -> Generator:
+    def execute(self, transformer: Callable, upstream: Iterable) -> Generator:
         input_queue = Queue(maxsize=self.threads)
         output_queue = Queue()
 
@@ -81,7 +78,7 @@ class ThreadPoolExecutor(Executor):
 
         workers = TPE(self.threads, 'thread-pool-executor-worker')
         for _ in range(self.threads):
-            workers.submit(self._work, input_queue, task, output_queue)
+            workers.submit(self._work, input_queue, transformer, output_queue)
 
         for output in iterate_until_none(output_queue.get, self.threads):
             yield output
@@ -97,12 +94,12 @@ class ThreadPoolExecutor(Executor):
 
     @classmethod
     def _work(cls, input_queue: Queue, transformer: Callable, output_queue: Queue):
-        for item in iterate_until_none(input_queue.get):
-            try:
-                for output in transformer(item):
-                    output_queue.put(output)
-            except BaseException as e:
-                output_queue.put(e)
+        items = (item for item in iterate_until_none(input_queue.get))
+        try:
+            for output in transformer(items):
+                output_queue.put(output)
+        except BaseException as e:
+            output_queue.put(e)
         output_queue.put(None)
 
     def parallelism(self):
@@ -138,12 +135,12 @@ class MultiProcessingExecutor(Executor):
 
     @classmethod
     def _work(cls, input_queue: mp.Queue, transformer: Callable, output_queue: mp.Queue):
-        for item in iterate_until_none(input_queue.get):
-            try:
-                for output in transformer(pickle.loads(item)):
-                    output_queue.put(pickle.dumps(output))
-            except BaseException as e:
-                output_queue.put(pickle.dumps(e))
+        items = (pickle.loads(item) for item in iterate_until_none(input_queue.get))
+        try:
+            for output in transformer(items):
+                output_queue.put(pickle.dumps(output))
+        except BaseException as e:
+            output_queue.put(pickle.dumps(e))
         output_queue.put(None)
 
     def parallelism(self):

@@ -152,25 +152,16 @@ class TransformedDataset(BaseDataset):
         return self.executor(**self._kwargs).execute(self._transformer, self._parent)
 
 
-class FlatMappedDataset(BaseDataset):
-    def __init__(self, parent, function, **kwargs):
-        self._parent = parent
-        self._function = function
-        self._kwargs = kwargs
-
-    def _upstream(self):
-        return [self._parent]
-
-    def __iter__(self):
-        return self.executor(**self._kwargs).execute(self._function, self._parent)
+class MappedDataset(TransformedDataset):
+    def __init__(self, parent, mapper, **kwargs):
+        super().__init__(parent, lambda items: (mapper(x) for x in items), **kwargs)
 
 
-class FilteredDataset(FlatMappedDataset):
-    def __init__(self, parent, function, **kwargs):
-        super().__init__(parent, lambda x: function(x) and [x] or [], **kwargs)
+class FilteredDataset(TransformedDataset):
+    def __init__(self, parent, predicate, **kwargs):
+        super().__init__(parent, lambda items: (x for x in items if predicate(x)), **kwargs)
 
 
-class MappedDataset(FlatMappedDataset):
-    def __init__(self, parent, function, **kwargs):
-        super().__init__(parent, lambda x: [function(x)], **kwargs)
-
+class FlatMappedDataset(TransformedDataset):
+    def __init__(self, parent, flatmapper, **kwargs):
+        super().__init__(parent, lambda items: (y for x in items for y in flatmapper(x)), **kwargs)

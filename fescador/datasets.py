@@ -35,11 +35,11 @@ class Dataset(ABC):
     def collect(self) -> list:
         return list(self)
 
-    def take(self, count):
-        return [item for item, n in zip(self, range(count))]
+    def take(self, count) -> 'Dataset':
+        return self.transform(lambda items: (item for item, n in zip(self, range(count))), background=False)
 
     def skip(self, count) -> 'Dataset':
-        raise NotImplementedError
+        return self.transform(lambda items: (item for i, item in enumerate(self) if i >= count), background=False)
 
     def group(self, size) -> 'Dataset':
         raise NotImplementedError
@@ -54,26 +54,7 @@ class Dataset(ABC):
         return self.map(lambda row: {key: row[key] for key in keys}, **kwargs)
 
     def shuffle(self, buffer_size, seed=None):
-        def generator(buffer_size, seed):
-            random = Random(seed)
-
-            # fill the buffer
-            iterator = iter(self)
-            buffer = [item for _, item in zip(range(buffer_size), iterator)]
-            random.shuffle(buffer)
-
-            # sample one from the buffer and replace with a new one pulled from the iterator
-            for item in iterator:
-                i = random.randrange(buffer_size)
-                yield buffer[i]
-                buffer[i] = item
-
-            # drain any remaining items
-            for item in buffer:
-                if item is not None:
-                    yield item
-
-        return self.flatmap
+        raise NotImplementedError
 
     def executor(self, **kwargs) -> Executor:
         if 'executor' in kwargs:
@@ -81,7 +62,10 @@ class Dataset(ABC):
             if isinstance(executor, Executor):
                 return executor
         if 'background' in kwargs:
-            return BackgroundThreadExecutor()
+            if kwargs['background'] is True:
+                return BackgroundThreadExecutor()
+            else:
+                return CurrentThreadExecutor()
         if 'num_threads' in kwargs:
             return ThreadPoolExecutor(int(kwargs['num_threads']))
         if 'num_processes' in kwargs:

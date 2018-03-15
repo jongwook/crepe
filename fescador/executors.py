@@ -3,10 +3,10 @@ import pickle
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor as TPE
 from queue import Queue
-from typing import Iterable, Callable, Generator, Optional
+from typing import Iterable, Callable, Generator
 
 
-def iter_until_none(f: Callable, count=1) -> Generator:
+def iterate_until_none(f: Callable, count=1) -> Generator:
     seen = 0
     while True:
         item = f()
@@ -40,7 +40,7 @@ class BackgroundThreadExecutor(Executor):
         background = TPE(1, 'background-executor')
         background.submit(self._work, upstream, task, queue)
 
-        for output in iter_until_none(queue.get):
+        for output in iterate_until_none(queue.get):
             yield output
 
         background.shutdown()
@@ -73,7 +73,7 @@ class ThreadPoolExecutor(Executor):
         for _ in range(self.threads):
             workers.submit(self._work, input_queue, task, output_queue)
 
-        for output in iter_until_none(output_queue.get, self.threads):
+        for output in iterate_until_none(output_queue.get, self.threads):
             yield output
 
         collector.shutdown()
@@ -87,7 +87,7 @@ class ThreadPoolExecutor(Executor):
 
     @classmethod
     def _work(cls, input_queue: Queue, task: Callable, output_queue: Queue):
-        for item in iter_until_none(input_queue.get):
+        for item in iterate_until_none(input_queue.get):
             try:
                 for output in task(item):
                     output_queue.put(output)
@@ -112,7 +112,7 @@ class MultiProcessingExecutor(Executor):
         with mp.Pool(self.processes) as pool:
             for _ in range(self.processes):
                 pool.apply_async(MultiProcessingExecutor._work, args=(input_queue, task, output_queue))
-            for output in iter_until_none(output_queue.get, self.processes):
+            for output in iterate_until_none(output_queue.get, self.processes):
                 yield pickle.loads(output)
 
         collector.shutdown()
@@ -125,7 +125,7 @@ class MultiProcessingExecutor(Executor):
 
     @classmethod
     def _work(cls, input_queue: mp.Queue, task: Callable, output_queue: mp.Queue):
-        for item in iter_until_none(input_queue.get):
+        for item in iterate_until_none(input_queue.get):
             try:
                 for output in task(pickle.loads(item)):
                     output_queue.put(pickle.dumps(output))

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from .executors import *
 from typing import List
+from . import readers
 
 
 class BaseDataset(ABC):
@@ -17,6 +18,12 @@ class BaseDataset(ABC):
         for _ in self.map(function, **kwargs):
             pass
 
+    def collect(self):
+        return list(self)
+
+    def take(self, count):
+        return [item for item, n in zip(self, range(count))]
+
     def _executor(self, **kwargs) -> Executor:
         if 'executor' in kwargs:
             executor = kwargs['executor']
@@ -28,6 +35,8 @@ class BaseDataset(ABC):
             return ThreadPoolExecutor(int(kwargs['num_threads']))
         if 'num_processes' in kwargs:
             return MultiProcessingExecutor(int(kwargs['num_processes']))
+        if len(kwargs) > 0:
+            raise ValueError("Unknown kwargs:", kwargs.keys())
         try:
             return self._upstream()[0]._executor()
         except IndexError:
@@ -43,6 +52,8 @@ class BaseDataset(ABC):
 
 
 class Dataset(BaseDataset):
+    read = readers.LazyLoader()
+
     def __init__(self, *args, **kwargs):
         if (len(args) == 0) == (len(kwargs) == 0):
             raise ValueError('either args or kwargs must be given')

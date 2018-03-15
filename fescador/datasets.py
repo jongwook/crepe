@@ -1,5 +1,6 @@
-from random import Random
 from typing import List
+
+import numpy as np
 import pandas as pd
 
 from . import readers
@@ -36,8 +37,23 @@ class Dataset(ABC):
     def collect(self) -> list:
         return list(self)
 
+    def shape(self, template=None):
+        template = template is None and self.first() or template
+        if isinstance(template, list):
+            return len(template)
+        if isinstance(template, np.ndarray):
+            return template.shape
+        if isinstance(template, tuple):
+            return tuple(self.shape(item) for item in template)
+        if isinstance(template, dict):
+            return {key: self.shape(template[key]) for key in template}
+        return tuple()
+
     def first(self):
-        return next(iter(self))
+        try:
+            return next(iter(self))
+        except StopIteration:
+            raise ValueError('empty dataset')
 
     def take(self, count: int) -> 'Dataset':
         return self.transform(lambda items: (item for item, n in zip(self, range(count))), background=False)

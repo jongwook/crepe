@@ -1,4 +1,4 @@
-import multiprocessing as mp
+import multiprocess as mp
 import pickle
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor as TPE

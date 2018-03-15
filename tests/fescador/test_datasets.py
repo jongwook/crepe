@@ -8,11 +8,7 @@ def assert_equal(dataset: Dataset, target: list):
 
 
 def assert_equal_unordered(dataset: Dataset, target: list):
-    collected = list(dataset)
-    collected.sort()
-    target.sort()
-
-    assert collected == target
+    assert set(dataset) == set(target)
 
 
 def test_simple_operations():
@@ -30,7 +26,7 @@ def test_executor_options():
 
     assert_equal(data.map(lambda x: x + 1, background=True), [2, 3, 4])
     assert_equal_unordered(data.map(lambda x: x + 1, num_threads=3), [2, 3, 4])
-    # assert_equal_unordered(data.map(lambda x: x + 1, num_processes=3), [2, 3, 4])
+    assert_equal_unordered(data.map(lambda x: x + 1, num_processes=3), [2, 3, 4])
 
     tid = current_thread().ident
     assert Dataset([1]).map(lambda _: current_thread().ident).take(1) == [tid]

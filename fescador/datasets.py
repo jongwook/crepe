@@ -29,7 +29,7 @@ class Dataset(ABC):
         return TransformedDataset(self, function, **kwargs)
 
     def foreach(self, function, **kwargs) -> None:
-        for _ in self.map(function, **kwargs):
+        for _ in self.map(lambda item: function(item) or True, **kwargs):
             pass
 
     def collect(self) -> list:
@@ -136,6 +136,7 @@ class InMemoryDataset(Dataset):
 
 class TransformedDataset(Dataset):
     def __init__(self, parent, transformer, **kwargs):
+        super().__init__()
         self._parent = parent
         self._transformer = transformer
         self._kwargs = kwargs

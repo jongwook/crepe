@@ -80,8 +80,8 @@ class Dataset(ABC):
     def loop(self, count: int=-1) -> 'Dataset':
         return LoopedDataset(self, count)
 
-    def batch(self, size) -> 'Dataset':
-        return MiniBatchDataset(self, size)
+    def batch(self, size, default_dtype=None) -> 'Dataset':
+        return MiniBatchDataset(self, size, default_dtype)
 
     def cache(self) -> 'Dataset':
         return CachedDataset(self)
@@ -210,10 +210,11 @@ class LoopedDataset(Dataset):
 
 
 class MiniBatchDataset(Dataset):
-    def __init__(self, upstream, size):
+    def __init__(self, upstream, size, default_dtype=None):
         super().__init__()
         self.upstream = upstream
         self.size = size
+        self.default_dtype = default_dtype
 
     def _upstream(self):
         return [self.upstream]
@@ -223,7 +224,7 @@ class MiniBatchDataset(Dataset):
         try:
             while True:
                 try:
-                    yield make_minibatch([next(iterator) for _ in range(self.size)])
+                    yield make_minibatch([next(iterator) for _ in range(self.size)], self.default_dtype)
                 except StopIteration:
                     return
         except GeneratorExit:

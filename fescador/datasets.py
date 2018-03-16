@@ -80,11 +80,8 @@ class Dataset(ABC):
     def loop(self, count: int=-1) -> 'Dataset':
         return LoopedDataset(self, count)
 
-    def group(self, size) -> 'Dataset':
-        raise NotImplementedError
-
     def batch(self, size) -> 'Dataset':
-        raise NotImplementedError
+        return MiniBatchDataset(self, size)
 
     def cache(self) -> 'Dataset':
         return CachedDataset(self)
@@ -210,6 +207,28 @@ class LoopedDataset(Dataset):
             except GeneratorExit:
                 close_iterator(iterator)
                 raise
+
+
+class MiniBatchDataset(Dataset):
+    def __init__(self, upstream, size):
+        super().__init__()
+        self.upstream = upstream
+        self.size = size
+
+    def _upstream(self):
+        return [self.upstream]
+
+    def __iter__(self):
+        iterator = iter(self.upstream)
+        try:
+            while True:
+                try:
+                    yield make_minibatch([next(iterator) for _ in range(self.size)])
+                except StopIteration:
+                    return
+        except GeneratorExit:
+            close_iterator(iterator)
+            raise
 
 
 class TransformedDataset(Dataset):

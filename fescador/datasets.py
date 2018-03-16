@@ -213,6 +213,19 @@ class LoopedDataset(Dataset):
 
 
 class TransformedDataset(Dataset):
+    class TransformerGuard:
+        def __init__(self, transformer):
+            self.transformer = transformer
+
+        def __call__(self, upstream):
+            iterator = iter(upstream)
+            try:
+                for item in self.transformer(iterator):
+                    yield item
+            except GeneratorExit:
+                close_iterator(iterator)
+                raise
+
     def __init__(self, upstream, transformer, **executor_config):
         super().__init__()
         self.upstream = upstream
@@ -223,7 +236,7 @@ class TransformedDataset(Dataset):
         return [self.upstream]
 
     def __iter__(self):
-        return self.executor(**self.executor_config).execute(TransformerGuard(self.transformer), self.upstream)
+        return self.executor(**self.executor_config).execute(self.TransformerGuard(self.transformer), self.upstream)
 
 
 class MappedDataset(TransformedDataset):

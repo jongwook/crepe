@@ -43,6 +43,7 @@ def tf_record_iterator(path, options=None):
         reader.Close()
 
 
+# TODO: faster protobuf->numpy conversion
 def parse_feature(feature: tf.train.Feature):
     kind = feature.WhichOneof('kind')
     if kind == 'float_list':

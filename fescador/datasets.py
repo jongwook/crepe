@@ -6,7 +6,7 @@ import pandas as pd
 from . import readers
 from . import writers
 from .executors import *
-from .utils import close_iterator
+from .utils import *
 
 
 class Dataset(ABC):
@@ -223,16 +223,7 @@ class TransformedDataset(Dataset):
         return [self.upstream]
 
     def __iter__(self):
-        return self.executor(**self.executor_config).execute(self._transform, self.upstream)
-
-    def _transform(self, upstream):
-        iterator = iter(upstream)
-        try:
-            for item in self.transformer(iterator):
-                yield item
-        except GeneratorExit:
-            close_iterator(iterator)
-            raise
+        return self.executor(**self.executor_config).execute(TransformerGuard(self.transformer), self.upstream)
 
 
 class MappedDataset(TransformedDataset):

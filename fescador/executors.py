@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor as TPE
 from queue import Queue
 from typing import Iterable, Callable, Generator
+from .utils import close_iterator
 
 
 def iterate_until_none(f: Callable, count=1) -> Generator:
@@ -44,8 +45,13 @@ class BackgroundThreadExecutor(Executor):
         background = TPE(1, 'background-executor')
         background.submit(self._work, upstream, transformer, queue)
 
-        for output in iterate_until_none(queue.get):
-            yield output
+        iterator = iterate_until_none(queue.get)
+        try:
+            for output in iterator:
+                yield output
+        except GeneratorExit:
+            close_iterator(iterator)
+            raise
 
         background.shutdown()
 
@@ -79,8 +85,13 @@ class ThreadPoolExecutor(Executor):
         for _ in range(self.threads):
             workers.submit(self._work, input_queue, transformer, output_queue)
 
-        for output in iterate_until_none(output_queue.get, self.threads):
-            yield output
+        iterator = iterate_until_none(output_queue.get, self.threads)
+        try:
+            for output in iterator:
+                yield output
+        except GeneratorExit:
+            close_iterator(iterator)
+            raise
 
         collector.shutdown()
         workers.shutdown()
@@ -120,8 +131,13 @@ class MultiProcessingExecutor(Executor):
         with mp.Pool(self.processes) as pool:
             for _ in range(self.processes):
                 pool.apply_async(MultiProcessingExecutor._work, args=(input_queue, transformer, output_queue))
-            for output in iterate_until_none(output_queue.get, self.processes):
-                yield output
+            iterator = iterate_until_none(output_queue.get, self.processes)
+            try:
+                for output in iterator:
+                    yield output
+            except GeneratorExit:
+                close_iterator(iterator)
+                raise
 
         collector.shutdown()
 

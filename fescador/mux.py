@@ -1,8 +1,8 @@
-from random import Random
 from typing import List
 
 from .datasets import Dataset
 from .executors import Executor, CurrentThreadExecutor
+from .utils import close_iterator
 
 
 class Mux(Dataset):
@@ -21,20 +21,30 @@ class SequentialMux(Mux):
         for dataset in self.datasets:
             if callable(dataset):
                 dataset = dataset()
-            for item in dataset:
-                yield item
+            iterator = iter(dataset)
+            try:
+                for item in dataset:
+                    yield item
+            except GeneratorExit:
+                close_iterator(iterator)
+                raise
 
 
 class RoundRobinMux(Mux):
     def __iter__(self):
         datasets = [callable(d) and d() or d for d in self.datasets]
         iterators = list(map(iter, datasets))
-        while len(iterators) > 0:
+        try:
+            while len(iterators) > 0:
+                for iterator in iterators:
+                    try:
+                        yield next(iterator)
+                    except StopIteration:
+                        iterators.remove(iterator)
+        except GeneratorExit:
             for iterator in iterators:
-                try:
-                    yield next(iterator)
-                except StopIteration:
-                    iterators.remove(iterator)
+                close_iterator(iterator)
+            raise
 
 
 class PoissonMux(Mux):

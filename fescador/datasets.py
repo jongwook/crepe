@@ -6,6 +6,7 @@ import pandas as pd
 from . import readers
 from . import writers
 from .executors import *
+from .utils import close_iterator
 
 
 class Dataset(ABC):
@@ -17,6 +18,7 @@ class Dataset(ABC):
 
     def __init__(self, *args, **kwargs):
         self.write = writers.LazyLoader(self)
+        self._shape = None
 
     def map(self, function, **executor_config) -> 'Dataset':
         return MappedDataset(self, function, **executor_config)
@@ -38,25 +40,39 @@ class Dataset(ABC):
         return list(self)
 
     def shape(self, template=None):
-        template = template is None and self.first() or template
+        root = template is None
+        if root:
+            if hasattr(self, '_shape') and self._shape is not None:
+                return self._shape
+            template = self.first()
+
         if isinstance(template, list):
-            return len(template)
-        if isinstance(template, np.ndarray):
-            return template.shape
-        if isinstance(template, tuple):
-            return tuple(self.shape(item) for item in template)
-        if isinstance(template, dict):
-            return {key: self.shape(template[key]) for key in template}
-        return tuple()
+            shape = len(template)
+        elif isinstance(template, np.ndarray):
+            shape = template.shape
+        elif isinstance(template, tuple):
+            shape = tuple(self.shape(item) for item in template)
+        elif isinstance(template, dict):
+            shape = {key: self.shape(template[key]) for key in template}
+        else:
+            shape = tuple()
+
+        if root:
+            self._shape = shape
+
+        return shape
 
     def first(self):
         try:
-            return next(iter(self))
-        except StopIteration:
+            return self.take(1)[0]
+        except IndexError:
             raise ValueError('empty dataset')
 
-    def take(self, count: int) -> 'Dataset':
-        return self.transform(lambda items: (item for item, n in zip(self, range(count))), background=False)
+    def take(self, count: int) -> list:
+        iterator = iter(self)
+        result = [item for item, n in zip(iterator, range(count))]
+        close_iterator(iterator)
+        return result
 
     def skip(self, count: int) -> 'Dataset':
         return self.transform(lambda items: (item for i, item in enumerate(self) if i >= count), background=False)
@@ -75,6 +91,9 @@ class Dataset(ABC):
 
     def select(self, *keys, **executor_config):
         return self.map(lambda row: {key: row[key] for key in keys}, **executor_config)
+
+    def select_tuple(self, *keys, **executor_config):
+        return self.map(lambda row: tuple(row[key] for key in keys), **executor_config)
 
     def shuffle(self, buffer_size=-1, seed=None):
         raise NotImplementedError
@@ -127,6 +146,9 @@ class Dataset(ABC):
     def __iter__(self):
         raise NotImplementedError
 
+    def __repr__(self):
+        return "({} of shape {})".format(type(self).__name__, self.shape())
+
 
 class InMemoryDataset(Dataset):
     def __init__(self, *args, **kwargs):
@@ -161,8 +183,13 @@ class InMemoryDataset(Dataset):
                 yield {key: value for key, value in zip(keys, record)}
         else:
             items = callable(self._items) and self._items() or self._items
-            for item in items:
-                yield item
+            iterator = iter(items)
+            try:
+                for item in iterator:
+                    yield item
+            except GeneratorExit:
+                close_iterator(iterator)
+                raise
 
 
 class LoopedDataset(Dataset):
@@ -176,8 +203,13 @@ class LoopedDataset(Dataset):
 
     def __iter__(self):
         for _ in self.count >= 0 and range(self.count) or iter(int, 1):
-            for item in self.upstream:
-                yield item
+            iterator = iter(self.upstream)
+            try:
+                for item in iterator:
+                    yield item
+            except GeneratorExit:
+                close_iterator(iterator)
+                raise
 
 
 class TransformedDataset(Dataset):
@@ -191,7 +223,16 @@ class TransformedDataset(Dataset):
         return [self.upstream]
 
     def __iter__(self):
-        return self.executor(**self.executor_config).execute(self.transformer, self.upstream)
+        return self.executor(**self.executor_config).execute(self._transform, self.upstream)
+
+    def _transform(self, upstream):
+        iterator = iter(upstream)
+        try:
+            for item in self.transformer(iterator):
+                yield item
+        except GeneratorExit:
+            close_iterator(iterator)
+            raise
 
 
 class MappedDataset(TransformedDataset):
@@ -233,5 +274,10 @@ class PrependedDataset(Dataset):
 
     def __iter__(self):
         yield self.other
-        for item in self.upstream:
-            yield item
+        iterator = iter(self.upstream)
+        try:
+            for item in self.upstream:
+                yield item
+        except GeneratorExit:
+            close_iterator(iterator)
+            raise

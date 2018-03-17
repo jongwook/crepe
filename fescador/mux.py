@@ -47,10 +47,12 @@ class RoundRobinMux(Mux):
             raise
 
 
-class PoissonMux(Mux):
-    def __init__(self, datasets):
+class StochasticMux(Mux):
+    def __init__(self, datasets, n_active, poisson_rate, shuffle_each=True):
         super().__init__(datasets)
-        raise NotImplementedError  # TODO
+        self.n_active = n_active
+        self.poisson_rate = poisson_rate
+        self.shuffle_each = shuffle_each
 
     def __iter__(self):
         raise NotImplementedError  # TODO

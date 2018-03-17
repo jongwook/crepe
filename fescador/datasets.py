@@ -1,7 +1,7 @@
 from typing import List
 
-import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from . import readers
 from . import writers
@@ -33,11 +33,21 @@ class Dataset(ABC):
         return TransformedDataset(self, function, **executor_config)
 
     def foreach(self, function, **executor_config) -> None:
+        """apply a function to each item"""
         for _ in self.map(lambda item: function(item) or True, **executor_config):
             pass
 
-    def collect(self) -> list:
-        return list(self)
+    def collect(self, verbose=False) -> list:
+        """collect all entries as a list"""
+        iterator = verbose and tqdm(iter(self)) or iter(self)
+        return list(iterator)
+
+    def numpy(self, verbose=False):
+        """collect all entries into numpy array(s)"""
+        if not verbose:
+            return make_batch(list(self))
+        else:
+            return make_batch(list(tqdm(self)))
 
     def shape(self, template=None):
         root = template is None
@@ -137,14 +147,18 @@ class Dataset(ABC):
 
     @abstractmethod
     def _upstream(self) -> List['Dataset']:
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def __iter__(self):
-        raise NotImplementedError
+        ...
 
     def __repr__(self):
-        return "({} of shape {})".format(type(self).__name__, self.shape())
+        try:
+            shape = "shape {}".format(self.shape())
+        except ValueError:
+            shape = "unknown shape"
+        return "(Dataset: {} of {})".format(type(self).__name__, shape)
 
 
 class InMemoryDataset(Dataset):
@@ -224,7 +238,7 @@ class MiniBatchDataset(Dataset):
         try:
             while True:
                 try:
-                    yield make_minibatch([next(iterator) for _ in range(self.size)], self.default_dtype)
+                    yield make_batch([next(iterator) for _ in range(self.size)], self.default_dtype)
                 except StopIteration:
                     return
         except GeneratorExit:

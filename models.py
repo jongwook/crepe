@@ -1,10 +1,14 @@
+import tensorflow as tf
 from tensorflow.python.keras.layers import *
 from tensorflow.python.keras.models import Model
 
 
-def crepe(optimizer, **_) -> Model:
+keras = tf.keras
+
+
+def crepe(optimizer, model_capacity=32, **_) -> Model:
     layers = [1, 2, 3, 4, 5, 6]
-    filters = [1024, 128, 128, 128, 256, 512]
+    filters = [n * model_capacity for n in [32, 4, 4, 4, 8, 16]]
     widths = [512, 64, 64, 64, 64, 64]
     strides = [(4, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1)]
 

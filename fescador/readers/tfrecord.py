@@ -73,9 +73,8 @@ def read_records(path: str, keys: List[str], options: tf.python_io.TFRecordOptio
                 if keys is None:
                     keys = list(feature_map.keys())
                 yield {key: parse_feature(feature_map[key]) for key in keys}
-        except GeneratorExit:
+        finally:
             close_iterator(iterator)
-            raise
 
 
 def tfrecord(*paths: str, keys: List[str]=None, compression: Optional[str]=None, **executor_config):

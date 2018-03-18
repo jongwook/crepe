@@ -49,9 +49,8 @@ class BackgroundThreadExecutor(Executor):
         try:
             for output in iterator:
                 yield output
-        except GeneratorExit:
+        finally:
             close_iterator(iterator)
-            raise
 
         background.shutdown()
 
@@ -89,9 +88,8 @@ class ThreadPoolExecutor(Executor):
         try:
             for output in iterator:
                 yield output
-        except GeneratorExit:
+        finally:
             close_iterator(iterator)
-            raise
 
         collector.shutdown()
         workers.shutdown()
@@ -135,9 +133,8 @@ class MultiProcessingExecutor(Executor):
             try:
                 for output in iterator:
                     yield output
-            except GeneratorExit:
+            finally:
                 close_iterator(iterator)
-                raise
 
         collector.shutdown()
 

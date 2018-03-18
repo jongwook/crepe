@@ -25,9 +25,8 @@ class SequentialMux(Mux):
             try:
                 for item in dataset:
                     yield item
-            except GeneratorExit:
+            finally:
                 close_iterator(iterator)
-                raise
 
 
 class RoundRobinMux(Mux):
@@ -40,11 +39,11 @@ class RoundRobinMux(Mux):
                     try:
                         yield next(iterator)
                     except StopIteration:
+                        close_iterator(iterator)
                         iterators.remove(iterator)
-        except GeneratorExit:
+        finally:
             for iterator in iterators:
                 close_iterator(iterator)
-            raise
 
 
 class StochasticMux(Mux):

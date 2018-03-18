@@ -188,6 +188,8 @@ class Dataset(ABC):
             shape = "shape {}".format(self.shape())
         except ValueError:
             shape = "unknown shape"
+        if isinstance(shape, dict):
+            shape = dict(sorted(shape.items()))  # dict() is sorted in Python >= 3.6
         return "(Dataset: {} of {})".format(type(self).__name__, shape)
 
 

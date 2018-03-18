@@ -19,7 +19,9 @@ class Dataset(ABC):
 
     def __init__(self, *args, **kwargs):
         self.write = writers.LazyLoader(self)
+        self._first = None
         self._shape = None
+        self._types = None
 
     def map(self, mapper: callable, **executor_config) -> 'Dataset':
         return MappedDataset(self, mapper, **executor_config)
@@ -48,12 +50,21 @@ class Dataset(ABC):
         else:
             return list(tqdm(self))
 
-    def collect(self, verbose: bool=False):
+    def collect(self, default_dtype=np.float32, verbose: bool=False):
         """collect all entries into one object, stacking one-dimension-higher numpy arrays where applicable"""
         if not verbose:
-            return make_batch(list(self))
+            return make_batch(list(self), default_dtype=default_dtype)
         else:
-            return make_batch(list(tqdm(self)))
+            return make_batch(list(tqdm(self)), default_dtype=default_dtype)
+
+    def first(self):
+        """returns the first element"""
+        try:
+            if self._first is None:
+                self._first = self.take(1).list()[0]
+            return self._first
+        except IndexError:
+            raise ValueError('empty dataset')
 
     def shape(self, template=None):
         """returns the shape(s) of the items in this dataset"""
@@ -64,7 +75,7 @@ class Dataset(ABC):
             template = self.first()
 
         if isinstance(template, list):
-            shape = len(template)
+            shape = [self.shape(item) for item in template]
         elif isinstance(template, np.ndarray):
             shape = template.shape
         elif isinstance(template, tuple):
@@ -79,12 +90,52 @@ class Dataset(ABC):
 
         return shape
 
-    def first(self):
-        """returns the first element"""
-        try:
-            return self.take(1).list()[0]
-        except IndexError:
-            raise ValueError('empty dataset')
+    def types(self, template=None):
+        """returns the type(s) of the items in this dataset"""
+        is_root = template is None
+        if is_root:
+            if hasattr(self, '_types') and self._types is not None:
+                return self._types
+            template = self.first()
+
+        if isinstance(template, list):
+            types = [self.types(item) for item in template]
+        elif isinstance(template, np.ndarray):
+            types = template.dtype
+        elif isinstance(template, tuple):
+            types = tuple(self.types(item) for item in template)
+        elif isinstance(template, dict):
+            types = {key: self.types(template[key]) for key in template}
+        elif isinstance(template, int):
+            types = np.int64
+        elif isinstance(template, float):
+            types = np.float32
+        else:
+            types = None
+
+        if is_root:
+            self._types = types
+
+        return types
+
+    def tensorflow(self):
+        """construct a tf.data.Dataset from this dataset"""
+        import tensorflow as tf
+
+        def np_to_tf(types):
+            if isinstance(types, tf.DType):
+                return types
+            if isinstance(types, np.dtype):
+                return tf.as_dtype(types)
+            if isinstance(types, list):
+                return [np_to_tf(item) for item in types]
+            if isinstance(types, tuple):
+                return tuple(np_to_tf(item) for item in types)
+            if isinstance(types, dict):
+                return {key: np_to_tf(types[key]) for key in types}
+            return None
+
+        return tf.data.Dataset.from_generator(lambda: iter(self), np_to_tf(self.types()), self.shape())
 
     def take(self, count: int) -> 'Dataset':
         """returns a dataset containing the first few items only"""
@@ -111,9 +162,9 @@ class Dataset(ABC):
         """loop over this dataset for a given number of cycles, or indefinitely by default"""
         return RepeatedDataset(self, times)
 
-    def batch(self, size: int, default_dtype=None) -> 'Dataset':
+    def batch(self, size: int, default_dtype: np.dtype=np.float32) -> 'Dataset':
         """create a dataset consisting of mini-batches of the elements in this dataset"""
-        return MiniBatchDataset(self, size, default_dtype)
+        return MiniBatchDataset(self, size, default_dtype=default_dtype)
 
     def cache(self, verbose=False) -> 'Dataset':
         """cache the content """
@@ -131,7 +182,7 @@ class Dataset(ABC):
         """shuffles the dataset using """
         return ShuffledDataset(self, buffer_size, seed)
 
-    def sample(self, count:int, buffer_size: int=-1, seed=None):
+    def sample(self, count: int, buffer_size: int=-1, seed=None):
         return self.shuffle(buffer_size, seed).take(count)
 
     @classmethod

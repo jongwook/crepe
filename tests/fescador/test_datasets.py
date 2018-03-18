@@ -30,6 +30,12 @@ def test_simple_operations(executor_config):
     assert_equal(Dataset([(1, 4), (2, 5), (3, 6)]).starmap(sum), [5, 7 ,9])
 
 
+def test_info():
+    data = Dataset(a=[1, 2, 3], b=[4, 5, 6])
+    assert data.shape() == {'a': (), 'b': ()}
+
+
+
 def test_executor_options():
     data = Dataset([1, 2, 3])
 

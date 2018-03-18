@@ -1,8 +1,12 @@
-import multiprocess as mp
+import ctypes
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor as TPE
-from queue import Queue
+from queue import Queue, Empty
+import time
 from typing import Iterable, Callable, Generator
+
+import multiprocess as mp
+
 from .utils import close_iterator
 
 
@@ -19,6 +23,21 @@ def iterate_until_none(f: Callable, count=1) -> Generator:
             else:
                 continue
         yield item
+
+
+def raise_in_thread(tid, exception):
+    ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exception))
+    if ret > 1:
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, 0)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
+
+def interrupt_queue_thread(queue, thread):
+    raise_in_thread(thread.ident, GeneratorExit)
+    try:
+        queue.get(block=False)
+    except Empty:
+        pass
 
 
 class Executor(ABC):
@@ -50,9 +69,11 @@ class BackgroundThreadExecutor(Executor):
             for output in iterator:
                 yield output
         finally:
+            background.shutdown(wait=False)
+            time.sleep(0.1)
+            for thread in background._threads:
+                interrupt_queue_thread(queue, thread)
             close_iterator(iterator)
-
-        background.shutdown()
 
     @classmethod
     def _work(cls, upstream: Iterable, transformer: Callable, queue: Queue):
@@ -60,6 +81,8 @@ class BackgroundThreadExecutor(Executor):
             for output in transformer(upstream):
                 queue.put(output)
         except BaseException as e:
+            if isinstance(e, GeneratorExit):
+                return
             queue.put(e)
         queue.put(None)
 
@@ -89,6 +112,10 @@ class ThreadPoolExecutor(Executor):
             for output in iterator:
                 yield output
         finally:
+            workers.shutdown(wait=False)
+            time.sleep(0.1)
+            for thread in workers._threads:
+                interrupt_queue_thread(output_queue, thread)
             close_iterator(iterator)
 
         collector.shutdown()
@@ -106,6 +133,8 @@ class ThreadPoolExecutor(Executor):
             for output in transformer(iterate_until_none(input_queue.get)):
                 output_queue.put(output)
         except BaseException as e:
+            if isinstance(e, GeneratorExit):
+                return
             output_queue.put(e)
         output_queue.put(None)
 

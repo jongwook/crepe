@@ -43,6 +43,16 @@ def test_numpy(executor_config):
     assert np.array_equal(data[0], np.array([2, 2]))
     assert np.array_equal(data[1], np.array([2, 2]))
 
+    data = Dataset([1, 2, 3, 4, 5]).map(lambda x: x + 1, **executor_config)
+
+    assert np.array_equal(data.collect(), np.array([2, 3, 4, 5, 6]))
+    assert np.array_equal(data.take(3).collect(), np.array([2, 3, 4]))
+    # assert np.array_equal(data.skip(2).collect(), np.array([4, 5, 6]))
+    # assert np.array_equal(data[:3].collect(), np.array([2, 3, 4]))
+    # assert np.array_equal(data[2:].collect(), np.array([4, 5, 6]))
+    # assert np.array_equal(data[1:4].collect(), np.array([3, 4, 5]))
+    # assert np.array_equal(data[::2].collect(), np.array([2, 4, 6]))
+
 
 def test_sequential_mux():
     a = Dataset([1, 2, 3])

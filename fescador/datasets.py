@@ -40,8 +40,10 @@ class Dataset(ABC):
 
     def list(self, verbose: bool=False) -> list:
         """collect all entries as a list"""
-        iterator = verbose and tqdm(iter(self)) or iter(self)
-        return list(iterator)
+        if not verbose:
+            return list(self)
+        else:
+            return list(tqdm(self))
 
     def collect(self, verbose: bool=False):
         """collect all entries into one object, stacking one-dimension-higher numpy arrays where applicable"""
@@ -370,11 +372,11 @@ class ShuffledDataset(Dataset):
             else:
                 buffer = list(iterator)
                 buffer_size = len(buffer)
-            random.shuffle(buffer)
+            self.random.shuffle(buffer)
 
             # sample one from the buffer and replace with a new one pulled from the iterator
             for item in iterator:
-                i = random.randrange(buffer_size)
+                i = self.random.randrange(buffer_size)
                 yield buffer[i]
                 buffer[i] = item
 

@@ -3,6 +3,7 @@ import os
 from mir_eval.melody import hz2cents
 import numpy as np
 from scipy.stats import norm
+from random import Random
 
 from fescador import *
 
@@ -17,7 +18,7 @@ classifier_norm_stdev = 25
 classifier_pdf_normalizer = norm.pdf(0)
 
 
-def to_classifier_label(pitch, crossentropy=False):
+def to_classifier_label(pitch):
     """
     Converts pitch labels in cents, to a vector representing the classification label
     Uses the normal distribution centered at the pitch and the standard deviation of 25 cents,
@@ -28,16 +29,28 @@ def to_classifier_label(pitch, crossentropy=False):
     """
     if np.isscalar(pitch) or pitch.shape == (1,):
         result = norm.pdf((classifier_cents - pitch) / classifier_norm_stdev)
-        result /= crossentropy and classifier_pdf_normalizer or np.sum(result)
+        result /= classifier_pdf_normalizer
     else:
         result = np.zeros((classifier_total_bins, len(pitch)))
         for i, p in enumerate(pitch):
             vec = norm.pdf((classifier_cents - p) / classifier_norm_stdev)
-            vec /= crossentropy and classifier_pdf_normalizer or np.sum(vec)
+            vec /= classifier_pdf_normalizer
             result[:, i] = vec
     if any(np.isnan(result)):
         result = np.zeros(result.shape)
     return result
+
+
+def to_weighted_average_cents(label):
+    if label.ndim == 1:
+        productsum = np.sum(classifier_cents * label)
+        weightsum = np.sum(label)
+        return productsum / weightsum
+    if label.ndim == 2:
+        productsum = np.sum(classifier_cents_2d * label, axis=0)
+        weightsum = np.sum(label, axis=0)
+        return productsum / weightsum
+    raise Exception("label should be either 1d or 2d ndarray")
 
 
 def train_dataset(*names, batch_size=32, loop=True) -> Dataset:
@@ -50,7 +63,7 @@ def train_dataset(*names, batch_size=32, loop=True) -> Dataset:
     datasets = [dataset.select_tuple('audio', 'pitch') for dataset in datasets]
 
     if loop:
-        datasets = [dataset.loop() for dataset in datasets]
+        datasets = [dataset.repeat() for dataset in datasets]
 
     result = Dataset.roundrobin(datasets)
     result = result.map(lambda x: (x[0], to_classifier_label(hz2cents(x[1]))))
@@ -61,11 +74,26 @@ def train_dataset(*names, batch_size=32, loop=True) -> Dataset:
     return result
 
 
-def validation_dataset(*names) -> Dataset:
+def validation_dataset(*names, sample_files=None, take=None, seed=None) -> Dataset:
     if len(names) == 0:
         names = ['bach10', 'mir1k', 'rwcsynth', 'nsynth-test', 'nsynth-valid']
+
     paths = [os.path.join('data', 'test', name) for name in names]
-    datasets = [Dataset.read.tfrecord(path, compression='gzip') for path in paths]
+    files = [os.path.join(path, file) for path in paths for file in os.listdir(path) if file.endswith('.tfrecord')]
+
+    if sample_files:
+        random = Random(seed or 0)
+        files = random.sample(files, sample_files)
+
+    datasets = [Dataset.read.tfrecord(file, compression='gzip') for file in files]
+    datasets = [dataset.select_tuple('audio', 'pitch') for dataset in datasets]
+
+    if take:
+        if seed:
+            datasets = [dataset.shuffle(seed=seed) for dataset in datasets]
+        datasets = [dataset.take(take) for dataset in datasets]
+
     result = Dataset.concat(datasets)
     result = result.map(lambda x: (x[0], to_classifier_label(hz2cents(x[1]))))
+
     return result

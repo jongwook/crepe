@@ -12,8 +12,8 @@ def crepe(optimizer, model_capacity=32, **_) -> Model:
     widths = [512, 64, 64, 64, 64, 64]
     strides = [(4, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1)]
 
-    x = Input(shape=(1024,), dtype='float32')
-    y = Reshape(target_shape=(1024, 1, 1))(x)
+    x = Input(shape=(1024,), name='input', dtype='float32')
+    y = Reshape(target_shape=(1024, 1, 1), name='input-reshape')(x)
 
     for layer, filters, width, strides in zip(layers, filters, widths, strides):
         y = BatchNormalization(name="conv%d-BN" % layer, epsilon=1e-5)(y)

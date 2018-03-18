@@ -24,6 +24,9 @@ class Dataset(ABC):
     def map(self, mapper: callable, **executor_config) -> 'Dataset':
         return MappedDataset(self, mapper, **executor_config)
 
+    def starmap(self, starmapper: callable, **executor_config) -> 'Dataset':
+        return StarMappedDataset(self, starmapper, **executor_config)
+
     def flatmap(self, flatmapper: callable, **executor_config) -> 'Dataset':
         return FlatMappedDataset(self, flatmapper, **executor_config)
 
@@ -299,6 +302,11 @@ class TransformedDataset(Dataset):
 class MappedDataset(TransformedDataset):
     def __init__(self, upstream: Dataset, mapper: callable, **executor_config):
         super().__init__(upstream, lambda items: (mapper(x) for x in items), **executor_config)
+
+
+class StarMappedDataset(TransformedDataset):
+    def __init__(self, upstream: Dataset, starmapper: callable, **executor_config):
+        super().__init__(upstream, lambda items: (isinstance(x, dict) and starmapper(**x) or starmapper(*x) for x in items), **executor_config)
 
 
 class FilteredDataset(TransformedDataset):

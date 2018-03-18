@@ -22,6 +22,13 @@ def test_simple_operations(executor_config):
     assert_equal(data.flatmap(lambda x: [x, x + 1], **executor_config), [1, 2, 2, 3, 3, 4])
     assert_equal(data.filter(lambda x: x % 2 == 0, **executor_config).map(lambda x: x / 2), [1])
 
+    def sum(a, b):
+        return a + b
+    
+    assert_equal(Dataset(a=[1, 2, 3], b=[4, 5, 6]).starmap(sum), [5, 7, 9])
+    assert_equal(Dataset([1, 2, 3], [4, 5, 6]).starmap(sum), [5, 7, 9])
+    assert_equal(Dataset([(1, 4), (2, 5), (3, 6)]).starmap(sum), [5, 7 ,9])
+
 
 def test_executor_options():
     data = Dataset([1, 2, 3])
@@ -35,7 +42,7 @@ def test_executor_options():
     assert Dataset([1]).map(lambda _: current_thread().ident, num_threads=1).first() != tid
 
 
-@pytest.mark.parametrize('executor_config', [{}, {'background': True}, {'num_threads': 3}, {'num_processes': 3}])
+@pytest.mark.parametrize('executor_config', [{}, {'background': True}])
 def test_numpy(executor_config):
 
     data = list(Dataset(np.ones((2, 2))).map(lambda x: x + 1, **executor_config))
@@ -47,11 +54,11 @@ def test_numpy(executor_config):
 
     assert np.array_equal(data.collect(), np.array([2, 3, 4, 5, 6]))
     assert np.array_equal(data.take(3).collect(), np.array([2, 3, 4]))
-    # assert np.array_equal(data.skip(2).collect(), np.array([4, 5, 6]))
-    # assert np.array_equal(data[:3].collect(), np.array([2, 3, 4]))
-    # assert np.array_equal(data[2:].collect(), np.array([4, 5, 6]))
-    # assert np.array_equal(data[1:4].collect(), np.array([3, 4, 5]))
-    # assert np.array_equal(data[::2].collect(), np.array([2, 4, 6]))
+    assert np.array_equal(data.skip(2).collect(), np.array([4, 5, 6]))
+    assert np.array_equal(data[:3].collect(), np.array([2, 3, 4]))
+    assert np.array_equal(data[2:].collect(), np.array([4, 5, 6]))
+    assert np.array_equal(data[1:4].collect(), np.array([3, 4, 5]))
+    assert np.array_equal(data[::2].collect(), np.array([2, 4, 6]))
 
 
 def test_sequential_mux():

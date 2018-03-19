@@ -2,6 +2,7 @@ import os
 import argparse
 from datetime import datetime
 from typing import List
+import importlib
 
 
 def timestamp():
@@ -38,19 +39,39 @@ options = vars(parser.parse_args())
 log_dir = os.path.join('experiments', options['experiment_name'])
 os.makedirs(log_dir, exist_ok=True)
 
+models = importlib.import_module("models")
+keras = models.keras
+tf = models.tf
+
 
 def log_path(*components):
     return os.path.join(log_dir, *components)
 
 
-def build_model():
+def build_model() -> keras.Model:
     """returns the Keras model according to the options"""
-    import models
     if options['load_model']:
-        return models.keras.models.load_model(options['load_model'])
+        return keras.models.load_model(options['load_model'])
     else:
-        model: models.keras.models.Model = getattr(models, options['model'])(**options)
+        model: keras.Model = getattr(models, options['model'])(**options)
         if options['load_model_weights']:
             model.load_weights(options['load_model_weights'])
         return model
 
+
+def get_default_callbacks() -> List[keras.callbacks.Callback]:
+    """returns a list of callbacks that are used by default"""
+    cb = keras.callbacks
+    result: List[cb.Callback] = [
+        cb.CSVLogger(log_path('learning-curve.tsv'), separator='\t'),
+    ]
+
+    if options['save_model_weights']:
+        result.append(cb.ModelCheckpoint(log_path(options['save_model_weights']), save_weights_only=True))
+    elif options['save_model']:
+        result.append(cb.ModelCheckpoint(log_path(options['save_model'])))
+
+    if options['tensorboard']:
+        result.append(cb.TensorBoard(log_path('tensorboard')))
+
+    return result

@@ -1,0 +1,8 @@
+tensorflow-gpu==1.6.0
+numpy
+scipy
+tqdm
+librosa
+mir_eval
+git+https://github.com/jongwook/flazy.git#egg=flazy
+

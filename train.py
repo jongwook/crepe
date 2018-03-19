@@ -1,8 +1,6 @@
 from config import *
 from datasets import *
 
-import tensorflow as tf
-
 
 def prepare_data() -> (Dataset, (np.ndarray, np.ndarray)):
     train = train_dataset(batch_size=options['batch_size'])
@@ -16,28 +14,24 @@ def prepare_data() -> (Dataset, (np.ndarray, np.ndarray)):
     return train, validation
 
 
-def get_callbacks() -> List[callable]:
-    cb = tf.keras.callbacks
-    result: List[cb.Callback] = [
-        cb.CSVLogger(log_path('learning-curve.tsv'), separator='\t'),
-    ]
+class PitchAccuracyCallback(keras.callbacks.Callback):
+    def __init__(self, val_data):
+        self.val_data = val_data
 
-    if options['save_model_weights']:
-        result.append(cb.ModelCheckpoint(log_path(options['save_model_weights']), save_weights_only=True))
-    elif options['save_model']:
-        result.append(cb.ModelCheckpoint(log_path(options['save_model'])))
+    def on_epoch_end(self, epoch, logs=None):
+        print(self.val_data[0].shape, self.val_data[1].shape)
 
-    if options['tensorboard']:
-        result.append(cb.TensorBoard(log_path('tensorboard')))
 
-    return result
+def main():
+    train_data, val_data = prepare_data()
+
+    model: keras.Model = build_model()
+    model.summary()
+
+    model.fit_generator(iter(train_data), steps_per_epoch=options['steps_per_epoch'], epochs=options['epochs'],
+                        callbacks=get_default_callbacks() + [PitchAccuracyCallback(val_data)],
+                        validation_data=val_data)
 
 
 if __name__ == "__main__":
-    train, validation = prepare_data()
-
-    model: tf.keras.Model = build_model()
-    model.summary()
-
-    model.fit_generator(iter(train), steps_per_epoch=options['steps_per_epoch'], epochs=options['epochs'],
-                        callbacks=get_callbacks(), validation_data=validation)
+    main()

@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import norm
 from random import Random
 
-from fescador import *
+from flazy import Dataset
 
 classifier_lowest_hz = 31.70
 classifier_lowest_cent = hz2cents(np.array([classifier_lowest_hz]))[0]
@@ -28,10 +28,10 @@ def to_classifier_label(pitch):
     :return: ndarray
     """
     if np.isscalar(pitch) or pitch.shape == (1,):
-        result = norm.pdf((classifier_cents - pitch) / classifier_norm_stdev)
+        result = norm.pdf((classifier_cents - pitch) / classifier_norm_stdev).astype(np.float32)
         result /= classifier_pdf_normalizer
     else:
-        result = np.zeros((classifier_total_bins, len(pitch)))
+        result = np.zeros((classifier_total_bins, len(pitch)), dtype=np.float32)
         for i, p in enumerate(pitch):
             vec = norm.pdf((classifier_cents - p) / classifier_norm_stdev)
             vec /= classifier_pdf_normalizer
@@ -82,8 +82,7 @@ def validation_dataset(*names, sample_files=None, take=None, seed=None) -> Datas
     files = [os.path.join(path, file) for path in paths for file in os.listdir(path) if file.endswith('.tfrecord')]
 
     if sample_files:
-        random = Random(seed or 0)
-        files = random.sample(files, sample_files)
+        files = Random(seed or 0).sample(files, sample_files)
 
     datasets = [Dataset.read.tfrecord(file, compression='gzip') for file in files]
     datasets = [dataset.select_tuple('audio', 'pitch') for dataset in datasets]

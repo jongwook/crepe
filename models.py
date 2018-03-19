@@ -16,7 +16,7 @@ def crepe(optimizer, model_capacity=32, **_) -> Model:
     y = Reshape(target_shape=(1024, 1, 1), name='input-reshape')(x)
 
     for layer, filters, width, strides in zip(layers, filters, widths, strides):
-        y = BatchNormalization(name="conv%d-BN" % layer, epsilon=1e-5)(y)
+        y = BatchNormalization(name="conv%d-BN" % layer)(y)
         y = Conv2D(filters, (width, 1), strides=strides, padding='same',
                    activation='relu', name="conv%d" % layer)(y)
         y = MaxPooling2D(pool_size=(2, 1), strides=None, padding='valid',

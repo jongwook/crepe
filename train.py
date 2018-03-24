@@ -1,14 +1,14 @@
 from config import *
 from datasets import *
+from evaluation import raw_pitch_accuracy
 
 
 def prepare_data() -> (Dataset, (np.ndarray, np.ndarray)):
-    train = train_dataset(batch_size=options['batch_size'])
-
+    train = train_dataset('rwcsynth', batch_size=options['batch_size'])
     print("Train dataset:", train)
-    print("Collecting validation set:")
 
-    validation = validation_dataset('mir1k', sample_files=100, take=100, seed=42).collect(verbose=True)
+    print("Collecting validation set:")
+    validation = validation_dataset('mir1k', sample_files=50, take=200, seed=42).collect(verbose=True)
     print("Validation data:", validation[0].shape, validation[1].shape)
 
     return train, validation
@@ -16,10 +16,16 @@ def prepare_data() -> (Dataset, (np.ndarray, np.ndarray)):
 
 class PitchAccuracyCallback(keras.callbacks.Callback):
     def __init__(self, val_data):
-        self.val_data = val_data
+        self.audio = val_data[0]
+        self.true_cents = to_weighted_average_cents(val_data[1])
 
-    def on_epoch_end(self, epoch, logs=None):
-        print(self.val_data[0].shape, self.val_data[1].shape)
+    def on_epoch_end(self, epoch, _):
+        predicted = self.model.predict(self.audio, verbose=1)
+        predicted_cents = to_weighted_average_cents(predicted)
+        mae = np.mean(np.abs(self.true_cents - predicted_cents))
+        rpa = raw_pitch_accuracy(self.true_cents, predicted_cents)
+
+        print("Epoch {}: MAE = {}, RPA = {}".format(epoch, mae, rpa))
 
 
 def main():

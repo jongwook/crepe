@@ -23,32 +23,23 @@ def to_classifier_label(pitch):
     Converts pitch labels in cents, to a vector representing the classification label
     Uses the normal distribution centered at the pitch and the standard deviation of 25 cents,
     normalized so that the exact prediction has the value 1.0.
-    :param pitch: a number of ndarray of dimension 1
+    :param pitch: a number or numpy array of shape (1,)
     pitch values in cents, as returned by hz2cents with base_frequency = 10 (default)
     :return: ndarray
     """
-    if np.isscalar(pitch) or pitch.shape == (1,):
-        result = norm.pdf((classifier_cents - pitch) / classifier_norm_stdev).astype(np.float32)
-        result /= classifier_pdf_normalizer
-    else:
-        result = np.zeros((classifier_total_bins, len(pitch)), dtype=np.float32)
-        for i, p in enumerate(pitch):
-            vec = norm.pdf((classifier_cents - p) / classifier_norm_stdev)
-            vec /= classifier_pdf_normalizer
-            result[:, i] = vec
-    if any(np.isnan(result)):
-        result = np.zeros(result.shape)
+    result = norm.pdf((classifier_cents - pitch) / classifier_norm_stdev).astype(np.float32)
+    result /= classifier_pdf_normalizer
     return result
 
 
 def to_weighted_average_cents(label):
     if label.ndim == 1:
-        productsum = np.sum(classifier_cents * label)
+        productsum = np.sum(label * classifier_cents)
         weightsum = np.sum(label)
         return productsum / weightsum
     if label.ndim == 2:
-        productsum = np.sum(classifier_cents_2d * label, axis=0)
-        weightsum = np.sum(label, axis=0)
+        productsum = np.dot(label, classifier_cents)
+        weightsum = np.sum(label, axis=1)
         return productsum / weightsum
     raise Exception("label should be either 1d or 2d ndarray")
 

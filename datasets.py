@@ -46,7 +46,7 @@ def to_weighted_average_cents(label):
 
 def train_dataset(*names, batch_size=32, loop=True) -> Dataset:
     if len(names) == 0:
-        names = ['mdbsynth', 'medleydb', 'nsynth-train']
+        names = ['mdbsynth', 'nsynth-train', 'mir1k', 'bach10']
 
     paths = [os.path.join('data', 'train', name) for name in names]
 
@@ -65,25 +65,31 @@ def train_dataset(*names, batch_size=32, loop=True) -> Dataset:
     return result
 
 
-def validation_dataset(*names, sample_files=None, take=None, seed=None) -> Dataset:
+def validation_dataset(*names, seed=None, take=None) -> Dataset:
     if len(names) == 0:
-        names = ['bach10', 'mir1k', 'rwcsynth', 'nsynth-test', 'nsynth-valid']
+        names = ['medleydb', 'rwcsynth', 'nsynth-test', 'nsynth-valid']
 
     paths = [os.path.join('data', 'test', name) for name in names]
-    files = [os.path.join(path, file) for path in paths for file in os.listdir(path) if file.endswith('.tfrecord')]
 
-    if sample_files:
-        files = Random(seed or 0).sample(files, sample_files)
+    all_datasets = []
 
-    datasets = [Dataset.read.tfrecord(file, compression='gzip') for file in files]
-    datasets = [dataset.select_tuple('audio', 'pitch') for dataset in datasets]
+    for path in paths:
+        files = [os.path.join(path, file) for file in os.listdir(path)]
 
-    if take:
+        if seed:
+            files = Random(seed).sample(files, len(files))
+
+        datasets = [Dataset.read.tfrecord(file, compression='gzip') for file in files]
+        datasets = [dataset.select_tuple('audio', 'pitch') for dataset in datasets]
+
         if seed:
             datasets = [dataset.shuffle(seed=seed) for dataset in datasets]
-        datasets = [dataset.take(take) for dataset in datasets]
+        if take:
+            datasets = [dataset.take(take) for dataset in datasets]
 
-    result = Dataset.concat(datasets)
+        all_datasets.append(Dataset.concat(datasets))
+
+    result = Dataset.roundrobin(all_datasets)
     result = result.map(lambda x: (x[0], to_classifier_label(hz2cents(x[1]))))
 
     return result

@@ -1,3 +1,4 @@
+import sys
 from config import *
 from datasets import *
 from evaluation import raw_pitch_accuracy
@@ -5,11 +6,11 @@ from evaluation import raw_pitch_accuracy
 
 def prepare_data() -> (Dataset, (np.ndarray, np.ndarray)):
     train = train_dataset('rwcsynth', batch_size=options['batch_size'])
-    print("Train dataset:", train)
+    print("Train dataset:", train, file=sys.stderr)
 
-    print("Collecting validation set:")
-    validation = validation_dataset('mir1k', sample_files=50, take=200, seed=42).collect(verbose=True)
-    print("Validation data:", validation[0].shape, validation[1].shape)
+    print("Collecting validation set:", file=sys.stderr)
+    validation = validation_dataset(seed=42, take=100).take(4000).collect(verbose=True)
+    print("Validation data:", validation[0].shape, validation[1].shape, file=sys.stderr)
 
     return train, validation
 
@@ -22,9 +23,9 @@ class PitchAccuracyCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, _):
         predicted = self.model.predict(self.audio, verbose=1)
         predicted_cents = to_weighted_average_cents(predicted)
-        mae = np.mean(np.abs(self.true_cents - predicted_cents))
+        diff = np.abs(self.true_cents - predicted_cents)
+        mae = np.mean(diff[np.isfinite(diff)])
         rpa = raw_pitch_accuracy(self.true_cents, predicted_cents)
-
         print("Epoch {}: MAE = {}, RPA = {}".format(epoch, mae, rpa))
 
 
@@ -40,4 +41,6 @@ def main():
 
 
 if __name__ == "__main__":
+    K = tf.keras.backend
+
     main()

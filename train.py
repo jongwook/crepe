@@ -26,7 +26,7 @@ class PitchAccuracyCallback(keras.callbacks.Callback):
         diff = np.abs(self.true_cents - predicted_cents)
         mae = np.mean(diff[np.isfinite(diff)])
         rpa = raw_pitch_accuracy(self.true_cents, predicted_cents)
-        print("Epoch {}: MAE = {}, RPA = {}".format(epoch, mae, rpa))
+        print("\nEpoch {}: MAE = {}, RPA = {}\n".format(epoch, mae, rpa), file=sys.stderr)
 
 
 def main():

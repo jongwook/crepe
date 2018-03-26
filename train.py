@@ -5,7 +5,7 @@ from evaluation import raw_pitch_accuracy
 
 
 def prepare_data() -> (Dataset, (np.ndarray, np.ndarray)):
-    train = train_dataset('rwcsynth', batch_size=options['batch_size'])
+    train = train_dataset(batch_size=options['batch_size'])
     print("Train dataset:", train, file=sys.stderr)
 
     print("Collecting validation set:", file=sys.stderr)

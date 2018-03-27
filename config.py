@@ -28,7 +28,7 @@ parser.add_argument('--save-model', default='model.h5', dest='save_model',
                     help='path to save the model on each epoch')
 parser.add_argument('--save-model-weights', default=None, dest='save_model_weights',
                     help='path to save the model weights on each epoch; supersedes --save-model')
-parser.add_argument('--epochs', default=100, dest='epochs', type=int,
+parser.add_argument('--epochs', default=300, dest='epochs', type=int,
                     help='number of epochs to train')
 parser.add_argument('--steps-per-epoch', default=1000, dest='steps_per_epoch', type=int,
                     help='number of steps in a batch')

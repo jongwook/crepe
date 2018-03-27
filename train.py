@@ -1,7 +1,7 @@
 import sys
 from config import *
 from datasets import *
-from evaluation import raw_pitch_accuracy
+from evaluation import accuracies
 
 
 def prepare_data() -> (Dataset, (np.ndarray, np.ndarray)):
@@ -25,8 +25,8 @@ class PitchAccuracyCallback(keras.callbacks.Callback):
         predicted_cents = to_weighted_average_cents(predicted)
         diff = np.abs(self.true_cents - predicted_cents)
         mae = np.mean(diff[np.isfinite(diff)])
-        rpa = raw_pitch_accuracy(self.true_cents, predicted_cents)
-        print("\nEpoch {}: MAE = {}, RPA = {}\n".format(epoch, mae, rpa), file=sys.stderr)
+        rpa, rca = accuracies(self.true_cents, predicted_cents)
+        print("\nEpoch {}: MAE = {}, RPA = {}, RCA = {}\n".format(epoch, mae, rpa, rca), file=sys.stderr)
 
 
 def main():

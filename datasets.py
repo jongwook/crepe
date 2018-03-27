@@ -1,11 +1,10 @@
 import os
 
-from mir_eval.melody import hz2cents
-import numpy as np
-from scipy.stats import norm
-from random import Random
-
 from flazy import Dataset
+from mir_eval.melody import hz2cents
+from scipy.stats import norm
+
+from augmentation import *
 
 classifier_lowest_hz = 31.70
 classifier_lowest_cent = hz2cents(np.array([classifier_lowest_hz]))[0]
@@ -44,7 +43,7 @@ def to_weighted_average_cents(label):
     raise Exception("label should be either 1d or 2d ndarray")
 
 
-def train_dataset(*names, batch_size=32, loop=True) -> Dataset:
+def train_dataset(*names, batch_size=32, loop=True, augment=True) -> Dataset:
     if len(names) == 0:
         names = ['mdbsynth', 'nsynth-train', 'mir1k', 'bach10']
 
@@ -57,6 +56,10 @@ def train_dataset(*names, batch_size=32, loop=True) -> Dataset:
         datasets = [dataset.repeat() for dataset in datasets]
 
     result = Dataset.roundrobin(datasets)
+
+    if augment:
+        result = result.starmap(add_noise)
+
     result = result.map(lambda x: (x[0], to_classifier_label(hz2cents(x[1]))))
 
     if batch_size:

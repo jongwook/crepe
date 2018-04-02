@@ -4,5 +4,5 @@ scipy
 tqdm
 librosa
 mir_eval
+pyrubberband
 git+https://github.com/jongwook/flazy.git#egg=flazy
-

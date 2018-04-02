@@ -11,7 +11,7 @@ def prepare_datasets() -> (Dataset, (np.ndarray, np.ndarray)):
     validation = []
     for name in ['medleydb', 'rwcsynth', 'nsynth-test', 'nsynth-valid']:
         print("Collecting validation set {}:".format(name), file=sys.stderr)
-        dataset = validation_dataset(name, seed=42, take=100).take(2000).collect(verbose=True)
+        dataset = validation_dataset(name, seed=42, take=100).take(4000).collect(verbose=True)
         validation.append(dataset)
 
     return train, validation

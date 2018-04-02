@@ -59,6 +59,7 @@ def train_dataset(*names, batch_size=32, loop=True, augment=True) -> Dataset:
 
     if augment:
         result = result.starmap(add_noise)
+        result = result.starmap(pitch_shift)
 
     result = result.map(lambda x: (x[0], to_classifier_label(hz2cents(x[1]))))
 

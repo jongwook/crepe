@@ -3,6 +3,7 @@ from random import Random
 
 try:
     import pyrubberband.rubberband
+    print('native rubberband library loaded')
     def shift(audio, amount):
         return pyrubberband.rubberband.pitch_shift(audio, 16000, amount, rbargs=['--realtime'])
 except ImportError:
@@ -27,7 +28,7 @@ def pitch_shift(audio, pitch):
         return audio, pitch
 
     amount = random.uniform(-2, 2)
-    audio = pyrb.pitch_shift(audio, 16000, amount)
+    audio = shift(audio, amount)
     pitch = pitch * 2.0 ** (amount / 12)
 
     return audio, pitch

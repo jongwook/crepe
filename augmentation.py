@@ -1,6 +1,14 @@
 import numpy as np
 from random import Random
-import pyrubberband as pyrb
+
+try:
+    import pyrubberband.rubberband
+    def shift(audio, amount):
+        return pyrubberband.rubberband.pitch_shift(audio, 16000, amount, rbargs=['--realtime'])
+except ImportError:
+    import pyrubberband as pyrb
+    def shift(audio, amount):
+        return pyrb.pitch_shift(audio, 16000, amount)
 
 random = Random(42)
 

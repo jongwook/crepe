@@ -14,6 +14,8 @@ parser.add_argument('model', nargs='?', default='crepe',
                     help='name of the model')
 parser.add_argument('experiment_name', nargs='?', default=timestamp(),
                     help='a unique identifier string for this run')
+parser.add_argument('--no-augment', dest='augment', action='store_false',
+                    help='an option to disable data augmentation')
 parser.add_argument('--optimizer', default='adam', dest='optimizer',
                     help='the name of Keras optimizer to use')
 parser.add_argument('--batch_size', default=32, type=int,

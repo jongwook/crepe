@@ -5,7 +5,7 @@ from evaluation import accuracies
 
 
 def prepare_datasets() -> (Dataset, (np.ndarray, np.ndarray)):
-    train = train_dataset(batch_size=options['batch_size'])
+    train = train_dataset(batch_size=options['batch_size'], augment=options['augment'])
     print("Train dataset:", train, file=sys.stderr)
 
     validation = []

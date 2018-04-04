@@ -21,8 +21,11 @@ for file in tqdm(files):
         freq = 2 ** ((pitch - 69) / 12.0) * 440
 
         for i in range(4):
+            start = (i + 1) * 1024
+            end = start + 1024
+            segment = audio[start:end]
             example = tf.train.Example(features=tf.train.Features(feature={
-                "audio": tf.train.Feature(float_list=tf.train.FloatList(value=audio[0:1024])),
+                "audio": tf.train.Feature(float_list=tf.train.FloatList(value=segment)),
                 "pitch": tf.train.Feature(float_list=tf.train.FloatList(value=[freq]))
             }))
             writer.write(example.SerializeToString())

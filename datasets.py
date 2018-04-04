@@ -4,7 +4,7 @@ from flazy import Dataset
 from mir_eval.melody import hz2cents
 from scipy.stats import norm
 
-from augmentation import *
+from transform import *
 
 classifier_lowest_hz = 31.70
 classifier_lowest_cent = hz2cents(np.array([classifier_lowest_hz]))[0]
@@ -56,6 +56,7 @@ def train_dataset(*names, batch_size=32, loop=True, augment=True) -> Dataset:
         datasets = [dataset.repeat() for dataset in datasets]
 
     result = Dataset.roundrobin(datasets)
+    result = result.starmap(normalize)
 
     if augment:
         result = result.starmap(add_noise)
@@ -94,6 +95,7 @@ def validation_dataset(*names, seed=None, take=None) -> Dataset:
         all_datasets.append(Dataset.concat(datasets))
 
     result = Dataset.roundrobin(all_datasets)
+    result = result.starmap(normalize)
     result = result.map(lambda x: (x[0], to_classifier_label(hz2cents(x[1]))))
 
     return result

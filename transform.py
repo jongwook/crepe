@@ -14,6 +14,12 @@ except ImportError:
 random = Random(42)
 
 
+def normalize(audio, pitch):
+    audio = audio - np.mean(audio)
+    audio /= np.std(audio)
+    return audio, pitch
+
+
 def add_noise(audio, pitch):
     if random.random() < 0.5:
         return audio, pitch

@@ -18,6 +18,8 @@ for file in tqdm(files):
 
         audio = example.features.feature['audio'].float_list.value
         pitch = example.features.feature['pitch'].int64_list.value[0]
+        note = example.features.feature['note_str'].bytes_list.value[0]
+        qualities = example.features.feature['qualities'].int64_list.value
 
         freq = 2 ** ((pitch - 69) / 12.0) * 440
 
@@ -27,7 +29,9 @@ for file in tqdm(files):
             segment = audio[start:end]
             example = tf.train.Example(features=tf.train.Features(feature={
                 "audio": tf.train.Feature(float_list=tf.train.FloatList(value=segment)),
-                "pitch": tf.train.Feature(float_list=tf.train.FloatList(value=[freq]))
+                "pitch": tf.train.Feature(float_list=tf.train.FloatList(value=[freq])),
+                "note": tf.train.Feature(bytes_list=tf.train.BytesList(value=[note])),
+                "qualities": tf.train.Feature(int64_list=tf.train.Int64List(value=qualities))
             }))
             writer.write(example.SerializeToString())
     writer.close()

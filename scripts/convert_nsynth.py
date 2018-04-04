@@ -1,15 +1,16 @@
 import os
+import sys
 import tensorflow as tf
 from tqdm import tqdm
 
-search_root = os.path.join('..', 'original')
+search_root = sys.argv[1]
 files = os.listdir(search_root)
 files = [file for file in files if file.endswith('.tfrecord')]
 options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.GZIP)
 
 for file in tqdm(files):
     input_path = os.path.join(search_root, file)
-    output_path = os.path.join('..', file)
+    output_path = file
     writer = tf.python_io.TFRecordWriter(output_path, options=options)
     for record in tf.python_io.tf_record_iterator(input_path):
         example = tf.train.Example()

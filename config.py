@@ -16,25 +16,27 @@ parser.add_argument('experiment_name', nargs='?', default=timestamp(),
                     help='a unique identifier string for this run')
 parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='an option to disable data augmentation')
-parser.add_argument('--optimizer', default='adam', dest='optimizer',
+parser.add_argument('--optimizer', default='adam',
                     help='the name of Keras optimizer to use')
 parser.add_argument('--batch_size', default=32, type=int,
                     help='the mini-batch size')
+parser.add_argument('--validation-take', default=4000, type=int,
+                    help='how many examples to take from each validation dataset')
 parser.add_argument('--model-capacity', default=32, type=int,
                     help='a multiplier to adjust the model capacity')
-parser.add_argument('--load-model', default=None, dest='load_model',
+parser.add_argument('--load-model', default=None,
                     help='when specified, the full model will be loaded from this path')
-parser.add_argument('--load-model-weights', default=None, dest='load_model_weights',
+parser.add_argument('--load-model-weights', default=None,
                     help='when specified, the model weights will be loaded from this path')
-parser.add_argument('--save-model', default='model.h5', dest='save_model',
+parser.add_argument('--save-model', default='model.h5',
                     help='path to save the model on each epoch')
-parser.add_argument('--save-model-weights', default=None, dest='save_model_weights',
+parser.add_argument('--save-model-weights', default=None,
                     help='path to save the model weights on each epoch; supersedes --save-model')
-parser.add_argument('--epochs', default=300, dest='epochs', type=int,
+parser.add_argument('--epochs', default=300, type=int,
                     help='number of epochs to train')
-parser.add_argument('--steps-per-epoch', default=1000, dest='steps_per_epoch', type=int,
+parser.add_argument('--steps-per-epoch', default=1000, type=int,
                     help='number of steps in a batch')
-parser.add_argument('--tensorboard', default=False, action='store_true', dest='tensorboard',
+parser.add_argument('--tensorboard', default=False, action='store_true',
                     help='when enabled, tensorboard data will be saved under the log directory')
 
 options = vars(parser.parse_args())

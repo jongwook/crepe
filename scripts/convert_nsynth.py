@@ -1,5 +1,6 @@
 import os
 import sys
+import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
@@ -25,6 +26,8 @@ for file in tqdm(files):
             start = (i + 1) * 1024
             end = start + 1024
             segment = audio[start:end]
+            if np.linalg.norm(segment) <= 1e-6:
+                continue
             example = tf.train.Example(features=tf.train.Features(feature={
                 "audio": tf.train.Feature(float_list=tf.train.FloatList(value=segment)),
                 "pitch": tf.train.Feature(float_list=tf.train.FloatList(value=[freq]))

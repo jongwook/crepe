@@ -43,6 +43,20 @@ def to_weighted_average_cents(label):
     raise Exception("label should be either 1d or 2d ndarray")
 
 
+def to_local_average_cents(label):
+    if label.ndim == 1:
+        argmax = int(np.argmax(label))
+        start = max(0, argmax - 4)
+        end = min(len(label), argmax + 5)
+        label = label[start:end]
+        productsum = np.sum(label * classifier_cents[start:end])
+        weightsum = np.sum(label)
+        return productsum / weightsum
+    if label.ndim == 2:
+        return np.array([to_local_average_cents(label[i, :]) for i in range(label.shape[0])])
+    raise Exception("label should be either 1d or 2d ndarray")
+
+
 def train_dataset(*names, batch_size=32, loop=True, augment=True) -> Dataset:
     if len(names) == 0:
         names = ['mdbsynth', 'nsynth-train', 'mir1k', 'bach10']

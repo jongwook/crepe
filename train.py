@@ -21,10 +21,13 @@ def prepare_datasets() -> (Dataset, (np.ndarray, np.ndarray)):
 
 
 class PitchAccuracyCallback(keras.callbacks.Callback):
-    def __init__(self, val_sets):
+    def __init__(self, val_sets, local_average=False):
         self.val_sets = [(audio, to_weighted_average_cents(pitch)) for audio, pitch in val_sets]
-        for filename in ["eval-mae.tsv", "eval-rpa.tsv", "eval-rca.tsv"]:
-            with open(log_path(filename), "w") as f:
+        self.local_average = local_average
+        self.to_cents = local_average and to_local_average_cents or to_weighted_average_cents
+        self.prefix = local_average and 'local-average-' or 'default-'
+        for filename in ["mae.tsv", "rpa.tsv", "rca.tsv"]:
+            with open(log_path(self.prefix + filename), "w") as f:
                 f.write('\t'.join(validation_set_names) + '\n')
 
     def on_epoch_end(self, epoch, _):
@@ -35,23 +38,24 @@ class PitchAccuracyCallback(keras.callbacks.Callback):
         RPAs = []
         RCAs = []
 
+        print("Epoch {}, validation accuracies (local_average = {})".format(epoch, self.local_average), file=sys.stderr)
         for audio, true_cents in self.val_sets:
             predicted = self.model.predict(audio)
-            predicted_cents = to_weighted_average_cents(predicted)
+            predicted_cents = self.to_cents(predicted)
             diff = np.abs(true_cents - predicted_cents)
             mae = np.mean(diff[np.isfinite(diff)])
             rpa, rca = accuracies(true_cents, predicted_cents)
             nans = np.mean(np.isnan(diff))
-            print("Epoch {}, Dataset {}: MAE = {}, RPA = {}, RCA = {}, nans = {}".format(epoch, names.pop(0), mae, rpa, rca, nans), file=sys.stderr)
+            print("{}: MAE = {}, RPA = {}, RCA = {}, nans = {}".format(names.pop(0), mae, rpa, rca, nans), file=sys.stderr)
             MAEs.append(mae)
             RPAs.append(rpa)
             RCAs.append(rca)
 
-        with open(log_path("eval-mae.tsv"), "a") as f:
+        with open(log_path(self.prefix + "mae.tsv"), "a") as f:
             f.write('\t'.join(['%.6f' % mae for mae in MAEs]) + '\n')
-        with open(log_path("eval-rpa.tsv"), "a") as f:
+        with open(log_path(self.prefix + "rpa.tsv"), "a") as f:
             f.write('\t'.join(['%.6f' % rpa for rpa in RPAs]) + '\n')
-        with open(log_path("eval-rca.tsv"), "a") as f:
+        with open(log_path(self.prefix + "rca.tsv"), "a") as f:
             f.write('\t'.join(['%.6f' % rca for rca in RCAs]) + '\n')
 
         print(file=sys.stderr)
@@ -65,7 +69,10 @@ def main():
     model.summary()
 
     model.fit_generator(iter(train_set), steps_per_epoch=options['steps_per_epoch'], epochs=options['epochs'],
-                        callbacks=get_default_callbacks() + [PitchAccuracyCallback(val_sets)],
+                        callbacks=get_default_callbacks() + [
+                            PitchAccuracyCallback(val_sets),
+                            PitchAccuracyCallback(val_sets, local_average=True)
+                        ],
                         validation_data=val_data)
 
 

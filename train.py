@@ -8,7 +8,10 @@ validation_set_names = ['medleydb', 'rwcsynth', 'nsynth-test', 'nsynth-valid']
 
 
 def prepare_datasets() -> (Dataset, (np.ndarray, np.ndarray)):
-    train = train_dataset(batch_size=options['batch_size'], augment=options['augment'])
+    names = ['mdbsynth', 'mir1k', 'bach10']
+    if not options['exclude_nsynth']:
+        names.append('nsynth-train')
+    train = train_dataset(*names, batch_size=options['batch_size'], augment=options['augment'])
     print("Train dataset:", train, file=sys.stderr)
 
     validation = []

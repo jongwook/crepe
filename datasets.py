@@ -59,7 +59,7 @@ def to_local_average_cents(label):
 
 def train_dataset(*names, batch_size=32, loop=True, augment=True) -> Dataset:
     if len(names) == 0:
-        names = ['mdbsynth', 'nsynth-train', 'mir1k', 'bach10']
+        raise ValueError("dataset names required")
 
     paths = [os.path.join('data', 'train', name) for name in names]
 
@@ -86,7 +86,7 @@ def train_dataset(*names, batch_size=32, loop=True, augment=True) -> Dataset:
 
 def validation_dataset(*names, seed=None, take=None) -> Dataset:
     if len(names) == 0:
-        names = ['medleydb', 'rwcsynth', 'nsynth-test', 'nsynth-valid']
+        raise ValueError("dataset names required")
 
     paths = [os.path.join('data', 'test', name) for name in names]
 

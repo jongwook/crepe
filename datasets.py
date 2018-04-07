@@ -4,7 +4,7 @@ from flazy import Dataset
 from mir_eval.melody import hz2cents
 from scipy.stats import norm
 
-from transform import *
+from transforms import *
 
 classifier_lowest_hz = 31.70
 classifier_lowest_cent = hz2cents(np.array([classifier_lowest_hz]))[0]

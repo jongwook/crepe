@@ -25,6 +25,7 @@ def prepare_datasets() -> (Dataset, (np.ndarray, np.ndarray)):
 
 class PitchAccuracyCallback(keras.callbacks.Callback):
     def __init__(self, val_sets, local_average=False):
+        super().__init__()
         self.val_sets = [(audio, to_weighted_average_cents(pitch)) for audio, pitch in val_sets]
         self.local_average = local_average
         self.to_cents = local_average and to_local_average_cents or to_weighted_average_cents
@@ -33,7 +34,7 @@ class PitchAccuracyCallback(keras.callbacks.Callback):
             with open(log_path(self.prefix + filename), "w") as f:
                 f.write('\t'.join(validation_set_names) + '\n')
 
-    def on_epoch_end(self, epoch, _):
+    def on_epoch_end(self, epoch, logs=None):
         names = list(validation_set_names)
         print(file=sys.stderr)
 
@@ -41,7 +42,7 @@ class PitchAccuracyCallback(keras.callbacks.Callback):
         RPAs = []
         RCAs = []
 
-        print("Epoch {}, validation accuracies (local_average = {})".format(epoch, self.local_average), file=sys.stderr)
+        print("Epoch {}, validation accuracies (local_average = {})".format(epoch + 1, self.local_average), file=sys.stderr)
         for audio, true_cents in self.val_sets:
             predicted = self.model.predict(audio)
             predicted_cents = self.to_cents(predicted)
@@ -73,7 +74,6 @@ def main():
 
     model.fit_generator(iter(train_set), steps_per_epoch=options['steps_per_epoch'], epochs=options['epochs'],
                         callbacks=get_default_callbacks() + [
-                            PitchAccuracyCallback(val_sets),
                             PitchAccuracyCallback(val_sets, local_average=True)
                         ],
                         validation_data=val_data)

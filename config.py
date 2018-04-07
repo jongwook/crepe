@@ -18,7 +18,7 @@ parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='an option to disable data augmentation')
 parser.add_argument('--optimizer', default='adam',
                     help='the name of Keras optimizer to use')
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch-size', default=32, type=int,
                     help='the mini-batch size')
 parser.add_argument('--exclude-nsynth', action='store_true',
                     help='exclude the nsynth-train dataset during training')
@@ -45,9 +45,8 @@ options = vars(parser.parse_args())
 log_dir = os.path.join('experiments', options['experiment_name'])
 os.makedirs(log_dir, exist_ok=True)
 
-# hack to avoid PEP8 warning about including a module in the middle of a code
-models = importlib.import_module("models")
-keras = importlib.import_module("keras")
+import keras   # noqa
+import models  # noqa
 
 
 def log_path(*components):
@@ -73,9 +72,9 @@ def get_default_callbacks() -> List[keras.callbacks.Callback]:
     ]
 
     if options['save_model_weights']:
-        result.append(cb.ModelCheckpoint(log_path(options['save_model_weights']), save_weights_only=True))
+        result.append(cb.ModelCheckpoint(log_path(options['save_model_weights']), save_best_only=True, save_weights_only=True))
     elif options['save_model']:
-        result.append(cb.ModelCheckpoint(log_path(options['save_model'])))
+        result.append(cb.ModelCheckpoint(log_path(options['save_model']), save_best_only=True))
 
     if options['tensorboard']:
         result.append(cb.TensorBoard(log_path('tensorboard')))

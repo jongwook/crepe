@@ -80,6 +80,4 @@ def main():
 
 
 if __name__ == "__main__":
-    K = tf.keras.backend
-
     main()

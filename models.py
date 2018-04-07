@@ -1,9 +1,5 @@
-import tensorflow as tf
-from tensorflow.python.keras.layers import *
-from tensorflow.python.keras.models import Model
-
-
-keras = tf.keras
+from keras.layers import *
+from keras.models import Model
 
 
 def crepe(optimizer, model_capacity=32, **_) -> Model:

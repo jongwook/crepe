@@ -45,9 +45,9 @@ options = vars(parser.parse_args())
 log_dir = os.path.join('experiments', options['experiment_name'])
 os.makedirs(log_dir, exist_ok=True)
 
+# hack to avoid PEP8 warning about including a module in the middle of a code
 models = importlib.import_module("models")
-keras = models.keras
-tf = models.tf
+keras = importlib.import_module("keras")
 
 
 def log_path(*components):

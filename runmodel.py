@@ -31,7 +31,7 @@ if args.output_path is None:
 
 def wav_stream(files):
     for file in files:
-        srate, data = wavfile.read(file)
+        srate, data = wavfile.read(os.path.join(args.input_path, file))
         if len(data.shape) == 2:
             data = data.mean(axis=1)
         if srate != 16000:
@@ -41,7 +41,7 @@ def wav_stream(files):
         n_frames = 1 + int((len(data) - 1024) / hop_length)
         frames = as_strided(data, shape=(1024, n_frames),
                             strides=(data.itemsize, hop_length * data.itemsize))
-        frames = frames.transpose()
+        frames = frames.transpose().astype(np.float32)
         yield (file, frames)
 
 

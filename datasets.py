@@ -43,17 +43,27 @@ def to_weighted_average_cents(label):
     raise Exception("label should be either 1d or 2d ndarray")
 
 
-def to_local_average_cents(label):
-    if label.ndim == 1:
-        argmax = int(np.argmax(label))
-        start = max(0, argmax - 4)
-        end = min(len(label), argmax + 5)
-        label = label[start:end]
-        productsum = np.sum(label * classifier_cents[start:end])
-        weightsum = np.sum(label)
-        return productsum / weightsum
-    if label.ndim == 2:
-        return np.array([to_local_average_cents(label[i, :]) for i in range(label.shape[0])])
+def to_local_average_cents(salience, center=None):
+    """find the weighted average cents near the argmax bin"""
+
+    import numpy as np
+
+    if not hasattr(to_local_average_cents, 'cents_mapping'):
+        # the bin number-to-cents mapping
+        to_local_average_cents.mapping = np.linspace(0, 7180, 360) + 1997.3794084376191
+
+    if salience.ndim == 1:
+        if center is None:
+            center = int(np.argmax(salience))
+        start = max(0, center - 4)
+        end = min(len(salience), center + 5)
+        salience = salience[start:end]
+        product_sum = np.sum(salience * to_local_average_cents.mapping[start:end])
+        weight_sum = np.sum(salience)
+        return product_sum / weight_sum
+    if salience.ndim == 2:
+        return np.array([to_local_average_cents(salience[i, :]) for i in range(salience.shape[0])])
+
     raise Exception("label should be either 1d or 2d ndarray")
 
 

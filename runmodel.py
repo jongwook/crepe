@@ -107,16 +107,18 @@ for name, data in stream:
     result_file = os.path.join(args.output_path, name + '.f0.csv')
     np.savetxt(result_file, result, fmt='%.6f', delimiter=',', header='time,frequency,confidence')
 
+    if args.save_numpy:
+        salience_file = os.path.join(args.output_path, name + '.salience.npy')
+        np.save(salience_file, predictions)
+
+    predictions = np.flip(predictions, axis=1)  # to draw the low pitches in the bottom
+
     figure_file = os.path.join(args.output_path, name + '.salience.png')
     image = inferno(predictions.transpose())
     image = np.pad(image, [(0, 20), (0, 0), (0, 0)], mode='constant')
     image[-20:-10, :, :] = viridis(confidence)[np.newaxis, :, :]
     image[-10:, :, :] = viridis((confidence > 0.5).astype(np.float))[np.newaxis, :, :]
     scipy.misc.imsave(figure_file, 255 * image)
-
-    if args.save_numpy:
-        salience_file = os.path.join(args.output_path, name + '.salience.npy')
-        np.save(salience_file, predictions)
 
     if args.truth_path:
         basename = name.replace('.npy.gz', '')

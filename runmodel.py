@@ -9,7 +9,7 @@ from numpy.lib.stride_tricks import as_strided
 from resampy import resample
 from scipy.io import wavfile
 
-from datasets import to_local_average_cents
+from datasets import to_local_average_cents, to_viterbi_cents
 
 parser = argparse.ArgumentParser()
 parser.add_argument('model',
@@ -22,6 +22,8 @@ parser.add_argument('--save-numpy', action='store_true',
                     help='save the salience representation to .npy file as well')
 parser.add_argument('--truth-path', default=None,
                     help='path to the corresponding .csv or .npy.gz files that contains the ground-truth annotations')
+parser.add_argument('--viterbi', action='store_true',
+                    help='run Viterbi decoding for finding the center frequencies')
 args = parser.parse_args()
 
 if args.output_path is None:
@@ -99,7 +101,10 @@ for name, data in stream:
     data -= np.mean(data, axis=1)[:, np.newaxis]
     data /= np.std(data, axis=1)[:, np.newaxis]
     predictions = model.predict(data, verbose=True)
-    cents = to_local_average_cents(predictions)
+    if args.viterbi:
+        cents = to_viterbi_cents(predictions)
+    else:
+        cents = to_local_average_cents(predictions)
     confidence = np.max(predictions, axis=1)
     hertz = 10.0 * 2 ** (cents / 1200.0)
     timestamps = 0.01 * np.array(range(hertz.shape[0]))

@@ -5,4 +5,6 @@ tqdm
 librosa
 mir_eval
 pyrubberband
+keras
+hmmlearn
 git+https://github.com/jongwook/flazy.git#egg=flazy

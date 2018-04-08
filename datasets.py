@@ -57,6 +57,36 @@ def to_local_average_cents(label):
     raise Exception("label should be either 1d or 2d ndarray")
 
 
+def to_viterbi_cents(salience):
+    """Find the Viterbi path using a transition prior that induces pitch continuity"""
+
+    import numpy as np
+    from hmmlearn import hmm
+
+    # uniform prior on the starting pitch
+    starting = np.ones(360) / 360
+
+    # transition probabilities inducing continuous pitch
+    xx, yy = np.meshgrid(range(360), range(360))
+    transition = np.maximum(12 - abs(xx - yy), 0) + np.ones(shape=(360, 360))
+    transition = transition / np.sum(transition, axis=1)[:, None]
+
+    # emission probability = 90% for self, 10% for others
+    emission = np.eye(360) * 0.9 + np.ones(shape=(360, 360)) * (0.1 / 359)
+
+    # fix the model parameters because we are not optimizing the model
+    model = hmm.MultinomialHMM(360, starting, transition)
+    model.startprob_ = starting
+    model.transmat_ = transition
+    model.emissionprob_ = emission
+
+    # find the Viterbi path
+    observations = np.argmax(salience, axis=1)
+    path = model.predict(observations.reshape(-1, 1), [len(observations)])
+
+    return np.array([to_local_average_cents(salience[i, :], path[i]) for i in range(len(observations))])
+
+
 def train_dataset(*names, batch_size=32, loop=True, augment=True) -> Dataset:
     if len(names) == 0:
         raise ValueError("dataset names required")

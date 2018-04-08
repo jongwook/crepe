@@ -78,7 +78,7 @@ def to_viterbi_cents(salience):
 
     # transition probabilities inducing continuous pitch
     xx, yy = np.meshgrid(range(360), range(360))
-    transition = np.maximum(12 - abs(xx - yy), 0) + np.ones(shape=(360, 360))
+    transition = np.maximum(12 - abs(xx - yy), 0)
     transition = transition / np.sum(transition, axis=1)[:, None]
 
     # emission probability = fixed probability for self, evenly distribute the others

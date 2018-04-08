@@ -4,18 +4,12 @@ import os
 import sys
 
 import matplotlib.cm
-import numpy as np
-import scipy.misc
-from mir_eval.melody import hz2cents
+from mir_eval.melody import *
 from numpy.lib.stride_tricks import as_strided
 from resampy import resample
 from scipy.io import wavfile
 
 from datasets import to_local_average_cents
-
-matplotlib.use('Agg')
-
-import matplotlib.pyplot as plt  # noqa
 
 parser = argparse.ArgumentParser()
 parser.add_argument('model',
@@ -79,6 +73,26 @@ model = keras.models.load_model(args.model)
 model.summary()
 
 inferno = matplotlib.cm.get_cmap('inferno')
+viridis = matplotlib.cm.get_cmap('viridis')
+jet = matplotlib.cm.get_cmap('jet')
+
+
+accuracy_file = os.path.join(args.output_path, 'accuracies.csv')
+with open(accuracy_file, "w") as f:
+    print("NAME,RPA,RCA,VR,VFA,OA", file=f)
+
+
+def report_accuracy(name, truth, estimated, confidence):
+    ref_voicing = truth != 0
+    est_voicing = confidence > 0.5
+
+    rpa = raw_pitch_accuracy(ref_voicing, truth, est_voicing, estimated)
+    rca = raw_chroma_accuracy(ref_voicing, truth, est_voicing, estimated)
+    recall, false_alarm = voicing_measures(ref_voicing, est_voicing)
+    oa = overall_accuracy(ref_voicing, truth, est_voicing, estimated)
+    with open(accuracy_file, "a") as f:
+        print("{},{},{},{},{},{}".format(name, rpa, rca, recall, false_alarm, oa), file=f)
+
 
 for name, data in stream:
     print('processing', name, 'of shape', data.shape)
@@ -86,15 +100,19 @@ for name, data in stream:
     data /= np.std(data, axis=1)[:, np.newaxis]
     predictions = model.predict(data, verbose=True)
     cents = to_local_average_cents(predictions)
+    confidence = np.max(predictions, axis=1)
     hertz = 10.0 * 2 ** (cents / 1200.0)
     timestamps = 0.01 * np.array(range(hertz.shape[0]))
-    result = np.vstack([timestamps, hertz]).transpose()
+    result = np.vstack([timestamps, hertz, confidence]).transpose()
     result_file = os.path.join(args.output_path, name + '.f0.csv')
-    np.savetxt(result_file, result, fmt='%.6f', delimiter=',')
+    np.savetxt(result_file, result, fmt='%.6f', delimiter=',', header='time,frequency,confidence')
 
     figure_file = os.path.join(args.output_path, name + '.salience.png')
-    pixels = inferno(predictions.transpose())
-    scipy.misc.imsave(figure_file, 255 * pixels)
+    image = inferno(predictions.transpose())
+    image = np.pad(image, [(0, 20), (0, 0), (0, 0)], mode='constant')
+    image[-20:-10, :, :] = viridis(confidence)[np.newaxis, :, :]
+    image[-10:, :, :] = viridis((confidence > 0.5).astype(np.float))[np.newaxis, :, :]
+    scipy.misc.imsave(figure_file, 255 * image)
 
     if args.save_numpy:
         salience_file = os.path.join(args.output_path, name + '.salience.npy')
@@ -112,13 +130,14 @@ for name, data in stream:
         else:
             print('truth file for {} not found'.format(name), file=sys.stderr)
         truth = hz2cents(truth)
+        report_accuracy(name, truth, cents, confidence)
 
         image = scipy.misc.imread(figure_file, mode='RGB')
-        image = np.pad(image, [(40, 0), (0, 0), (0, 0)], mode='constant')
-        jet = matplotlib.cm.get_cmap('jet')
+        image = np.pad(image, [(20, 0), (0, 0), (0, 0)], mode='constant')
+
         for i in range(image.shape[1]):
             if truth[i] < 1:
                 continue  # no-voice
-            image[:40, i, :] = 255 * np.array(jet(int(abs(truth[i] - cents[i]))))[:3]
+            image[:20, i, :] = 255 * np.array(jet(int(abs(truth[i] - cents[i]))))[:3]
 
         scipy.misc.imsave(figure_file.replace('.png', '.eval.png'), image)

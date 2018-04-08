@@ -78,6 +78,8 @@ import keras  # noqa
 model = keras.models.load_model(args.model)
 model.summary()
 
+inferno = matplotlib.cm.get_cmap('inferno')
+
 for name, data in stream:
     print('processing', name, 'of shape', data.shape)
     data -= np.mean(data, axis=1)[:, np.newaxis]
@@ -91,11 +93,8 @@ for name, data in stream:
     np.savetxt(result_file, result, fmt='%.6f', delimiter=',')
 
     figure_file = os.path.join(args.output_path, name + '.salience.png')
-    dpi = 120
-    fig = plt.figure(figsize=(predictions.shape[0] / dpi, predictions.shape[1] / dpi), dpi=dpi)
-    fig.figimage(predictions.transpose(), vmin=0, vmax=1, cmap='inferno', origin='lower')
-    fig.savefig(figure_file)
-    plt.close(fig)
+    pixels = inferno(predictions.transpose())
+    scipy.misc.imsave(figure_file, 255 * pixels)
 
     if args.save_numpy:
         salience_file = os.path.join(args.output_path, name + '.salience.npy')

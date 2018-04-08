@@ -79,21 +79,24 @@ viridis = matplotlib.cm.get_cmap('viridis')
 jet = matplotlib.cm.get_cmap('jet')
 
 
-accuracy_file = os.path.join(args.output_path, 'accuracies.csv')
-with open(accuracy_file, "w") as f:
-    print("NAME,RPA,RCA,VR,VFA,OA", file=f)
+accuracy_files = [os.path.join(args.output_path, 'accuracies-%.2f.csv' % f) for f in np.arange(0.40, 0.95, 0.05)]
+for accuracy_file in accuracy_files:
+    with open(accuracy_file, "w") as f:
+        print("NAME,RPA,RCA,VR,VFA,OA", file=f)
 
 
 def report_accuracy(name, truth, estimated, confidence):
-    ref_voicing = truth != 0
-    est_voicing = confidence > 0.5
+    for accuracy_file, tau in zip(accuracy_files, np.arange(0.40, 0.95, 0.05)):
+        ref_voicing = truth != 0
+        est_voicing = confidence > tau
 
-    rpa = raw_pitch_accuracy(ref_voicing, truth, est_voicing, estimated)
-    rca = raw_chroma_accuracy(ref_voicing, truth, est_voicing, estimated)
-    recall, false_alarm = voicing_measures(ref_voicing, est_voicing)
-    oa = overall_accuracy(ref_voicing, truth, est_voicing, estimated)
-    with open(accuracy_file, "a") as f:
-        print("{},{},{},{},{},{}".format(name, rpa, rca, recall, false_alarm, oa), file=f)
+        rpa = raw_pitch_accuracy(ref_voicing, truth, est_voicing, estimated)
+        rca = raw_chroma_accuracy(ref_voicing, truth, est_voicing, estimated)
+        recall, false_alarm = voicing_measures(ref_voicing, est_voicing)
+        oa = overall_accuracy(ref_voicing, truth, est_voicing, estimated)
+
+        with open(accuracy_file, "a") as f:
+            print("{},{},{},{},{},{}".format(name, rpa, rca, recall, false_alarm, oa), file=f)
 
 
 for name, data in stream:

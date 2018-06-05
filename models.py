@@ -86,3 +86,30 @@ def short(optimizer, model_capacity=32, **_) -> Model:
     model.compile(optimizer, 'binary_crossentropy')
 
     return model
+
+
+def dilated(optimizer, model_capacity=32, **_) -> Model:
+    layers = 30
+    filters = [model_capacity * 4] * layers
+    widths = [3] * layers
+
+    x = Input(shape=(1024,), name='input', dtype='float32')
+    y = Reshape(target_shape=(1024, 1, 1), name='input-reshape')(x)
+
+    for layer, filters, width in zip(range(layers), filters, widths):
+        dilation = 2 ** (layer % 10)
+        yy = y
+        y = Conv2D(filters, (width, 1), dilation_rate=(dilation, 1),
+                   padding='same', activation='relu', name="conv%d" % layer)(y)
+        y = BatchNormalization(name="conv%d-BN" % layer)(y)
+        y = Conv2D(filters, (1, 1), activation='linear', name="conv%d-1x1" % layer)(y)
+        y = Add()([y, yy])
+
+    y = AvgPool2D(pool_size=(64, 1), padding='valid', name="avgpool")(y)
+    y = Flatten(name="flatten")(y)
+    y = Dense(360, activation='sigmoid', name="classifier")(y)
+
+    model = Model(inputs=x, outputs=y)
+    model.compile(optimizer, 'binary_crossentropy')
+
+    return model

@@ -2,7 +2,6 @@ import os
 import argparse
 from datetime import datetime
 from typing import List
-import importlib
 
 
 def timestamp():
@@ -20,8 +19,6 @@ parser.add_argument('--optimizer', default='adam',
                     help='the name of Keras optimizer to use')
 parser.add_argument('--batch-size', default=32, type=int,
                     help='the mini-batch size')
-parser.add_argument('--exclude-nsynth', action='store_true',
-                    help='exclude the nsynth-train dataset during training')
 parser.add_argument('--validation-take', default=4000, type=int,
                     help='how many examples to take from each validation dataset')
 parser.add_argument('--model-capacity', default=32, type=int,

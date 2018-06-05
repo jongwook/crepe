@@ -4,13 +4,11 @@ from datasets import *
 from evaluation import accuracies
 
 
-validation_set_names = ['medleydb', 'rwcsynth', 'nsynth-test', 'nsynth-valid']
+validation_set_names = ['medleydb']
 
 
 def prepare_datasets() -> (Dataset, (np.ndarray, np.ndarray)):
-    names = ['mdbsynth', 'mir1k', 'bach10']
-    if not options['exclude_nsynth']:
-        names.append('nsynth-train')
+    names = ['mdbsynth']
     train = train_dataset(*names, batch_size=options['batch_size'], augment=options['augment'])
     print("Train dataset:", train, file=sys.stderr)
 

@@ -29,9 +29,9 @@ def crepe(optimizer, model_capacity=32, **_) -> Model:
     return model
 
 
-def rescrepe(optimizer, model_capacity=16, **_) -> Model:
+def rescrepe(optimizer, model_capacity=32, **_) -> Model:
     layers = [1, 2, 3, 4, 5, 6, 7, 8]
-    filters = [n * model_capacity for n in [16, 8, 8, 4, 4, 8, 8, 16]]
+    filters = [n * model_capacity for n in [8, 4, 4, 2, 2, 4, 4, 8]]
     widths = [512, 256, 128, 64, 64, 32, 16, 8]
     strides = [(1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1)]
 
@@ -47,6 +47,35 @@ def rescrepe(optimizer, model_capacity=16, **_) -> Model:
         y = BatchNormalization(name="conv%d-BN" % layer)(y)
         y = MaxPooling2D(pool_size=(2, 1), strides=None, padding='valid',
                          name="conv%d-maxpool" % layer)(Add()([y, yy]))
+        y = Dropout(0.25, name="conv%d-dropout" % layer)(y)
+
+    y = Permute((2, 1, 3), name="transpose")(y)
+    y = Flatten(name="flatten")(y)
+    y = Dense(360, activation='sigmoid', name="classifier")(y)
+
+    model = Model(inputs=x, outputs=y)
+    model.compile(optimizer, 'binary_crossentropy')
+
+    return model
+
+
+def short(optimizer, model_capacity=32, **_) -> Model:
+    layers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    filters = [n * model_capacity for n in [8, 8, 8, 16, 16, 16, 16, 32, 32, 32]]
+    widths = [3, 3, 3, 3, 3, 3, 3, 3, 3]
+    strides = [(1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1)]
+
+    x = Input(shape=(1024,), name='input', dtype='float32')
+    y = Reshape(target_shape=(1024, 1, 1), name='input-reshape')(x)
+
+    y = Conv2D(128, (3, 1), padding='same', activation='relu', name="conv0")(y)
+
+    for layer, filters, width, strides in zip(layers, filters, widths, strides):
+        y = Conv2D(filters, (width, 1), strides=strides, padding='same',
+                   activation='relu', name="conv%d" % layer)(y)
+        y = BatchNormalization(name="conv%d-BN" % layer)(y)
+        y = MaxPooling2D(pool_size=(2, 1), strides=None, padding='valid',
+                         name="conv%d-maxpool" % layer)(y)
         y = Dropout(0.25, name="conv%d-dropout" % layer)(y)
 
     y = Permute((2, 1, 3), name="transpose")(y)

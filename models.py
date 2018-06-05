@@ -29,10 +29,10 @@ def crepe(optimizer, model_capacity=32, **_) -> Model:
     return model
 
 
-def rescrepe(optimizer, model_capacity=32, **_) -> Model:
+def rescrepe(optimizer, model_capacity=16, **_) -> Model:
     layers = [1, 2, 3, 4, 5, 6, 7, 8]
-    filters = [n * model_capacity for n in [8, 8, 8, 8, 8, 8, 8, 8]]
-    widths = [64, 64, 64, 64, 64, 32, 16, 8]
+    filters = [n * model_capacity for n in [16, 8, 8, 4, 4, 8, 8, 16]]
+    widths = [512, 256, 128, 64, 64, 32, 16, 8]
     strides = [(1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1)]
 
     x = Input(shape=(1024,), name='input', dtype='float32')
@@ -40,6 +40,8 @@ def rescrepe(optimizer, model_capacity=32, **_) -> Model:
 
     for layer, filters, width, strides in zip(layers, filters, widths, strides):
         yy = y
+        if K.int_shape(yy)[-1] != filters:
+            yy = Conv2D(filters, (1, 1))(yy)
         y = Conv2D(filters, (width, 1), strides=strides, padding='same',
                    activation='relu', name="conv%d" % layer)(y)
         y = BatchNormalization(name="conv%d-BN" % layer)(y)

@@ -8,7 +8,7 @@ validation_set_names = ['medleydb']
 
 
 def prepare_datasets() -> (Dataset, (np.ndarray, np.ndarray)):
-    names = ['mdbsynth']
+    names = ['mdbsynth', 'mir1k', 'bach10']
     train = train_dataset(*names, batch_size=options['batch_size'], augment=options['augment'])
     print("Train dataset:", train, file=sys.stderr)
 
